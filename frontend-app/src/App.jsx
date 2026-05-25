@@ -177,13 +177,9 @@ export default function App() {
     const latStep = 0.05;
     const lonStep = 0.05;
 
-    const values = stations.map(s => {
-      const pred = allPredictions[s.id];
-      return pred?.return_levels?.[`${selectedPeriod}_year`] ?? 0;
-    }).filter(v => v > 0);
-
-    const minVal = Math.min(...values) || 100;
-    const maxVal = Math.max(...values) || 300;
+    // สเกลสีแบบคงที่ (Absolute Scale: 90 - 310 มม.) เพื่อให้สีบนแผนที่เปลี่ยนความแดงเข้มขึ้นตามคาบปีจริง
+    const minVal = 90;
+    const maxVal = 310;
 
     const calculateIDW = (lat, lon) => {
       let sumWeights = 0;
