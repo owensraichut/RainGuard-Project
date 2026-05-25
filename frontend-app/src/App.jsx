@@ -10,8 +10,8 @@ import {
 
 const returnPeriods = [2, 5, 10, 20, 50, 100];
 
-// 🌐 ตั้งค่า API_URL ที่นี่ที่เดียว (เปลี่ยนจาก localhost เป็นของ Render.com ในภายหลัง)
-const API_BASE_URL = "https://rainguard-api.onrender.com"; // ⚠️ เปลี่ยนเป็นลิงก์ Render ของคุณเมื่อเอาขึ้นออนไลน์
+// 🌐 ตั้งค่า API_URL โดยดึงจาก env (หรือเบนไปที่ localhost:8000 สำหรับการพัฒนาแบบ local)
+const API_BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:8000";
 
 const MOCK_STATIONS = [
   { id: "48363", name: "บึงกาฬ (48363)", latitude: 17.9559, longitude: 103.5058 },
