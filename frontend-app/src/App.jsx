@@ -14,12 +14,12 @@ const returnPeriods = [2, 5, 10, 20, 50, 100];
 const API_BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:8000";
 
 const MOCK_STATIONS = [
-  { id: "48363", name: "บึงกาฬ (48363)", latitude: 17.9559, longitude: 103.5058 },
-  { id: "48357", name: "นครพนม (48357)", latitude: 17.3935, longitude: 104.7749 },
-  { id: "48358", name: "นครพนม สกษ. (48358)", latitude: 17.3571, longitude: 104.8086 },
-  { id: "48356", name: "สกลนคร (48356)", latitude: 17.2000, longitude: 104.1494 },
-  { id: "48355", name: "สกลนคร สกษ. (48355)", latitude: 17.1543, longitude: 104.1500 },
-  { id: "48383", name: "มุกดาหาร (48383)", latitude: 16.4865, longitude: 104.7240 },
+  { id: "48363", name: "บึงกาฬ (48363)", latitude: 18.4136, longitude: 103.5167 },
+  { id: "48357", name: "นครพนม (48357)", latitude: 17.4167, longitude: 104.7833 },
+  { id: "48358", name: "นครพนม สกษ. (48358)", latitude: 17.2764, longitude: 104.7737 },
+  { id: "48356", name: "สกลนคร (48356)", latitude: 17.1549, longitude: 104.1370 },
+  { id: "48355", name: "สกลนคร สกษ. (48355)", latitude: 17.1250, longitude: 104.0610 },
+  { id: "48383", name: "มุกดาหาร (48383)", latitude: 16.5416, longitude: 104.7291 },
 ];
 
 const generateMockData = (stationId) => {
