@@ -7,6 +7,7 @@ import {
   Calendar, MapPin, Activity, AlertTriangle, CheckCircle, Home, Loader2, ChevronRight, DownloadCloud, FileText,
   Navigation, Menu, X
 } from 'lucide-react';
+import L from 'leaflet';
 
 const returnPeriods = [2, 5, 10, 20, 50, 100];
 
@@ -58,6 +59,7 @@ export default function App() {
   const [selectedPeriod, setSelectedPeriod] = useState(100);
   const [predictionData, setPredictionData] = useState(null);
   const [alerts, setAlerts] = useState([]);
+  const [allPredictions, setAllPredictions] = useState({});
   const [isLoading, setIsLoading] = useState(true);
   const [apiStatus, setApiStatus] = useState("connecting");
   
@@ -127,6 +129,168 @@ export default function App() {
         setIsLoading(false);
       });
   }, [selectedStation]);
+
+  // 3. ดึงข้อมูลพยากรณ์สำหรับทุกสถานีมาเก็บไว้คำนวณ IDW
+  useEffect(() => {
+    if (!stations || stations.length === 0) return;
+    
+    const fetchAllPredictions = async () => {
+      const promises = stations.map(async (s) => {
+        try {
+          const res = await fetch(`${API_BASE_URL}/api/prediction/${s.id}`);
+          if (!res.ok) throw new Error("API Fail");
+          const data = await res.json();
+          return { id: s.id, data };
+        } catch (e) {
+          return { id: s.id, data: generateMockData(s.id) };
+        }
+      });
+      const results = await Promise.all(promises);
+      const predMap = {};
+      results.forEach(item => {
+        predMap[item.id] = item.data;
+      });
+      setAllPredictions(predMap);
+    };
+
+    fetchAllPredictions();
+  }, [stations]);
+
+  // 4. วาดแผนที่ Leaflet และทำ IDW Interpolation
+  useEffect(() => {
+    if (activePage !== 'map' || !allPredictions || Object.keys(allPredictions).length === 0) return;
+
+    const mapContainer = document.getElementById('leaflet-map');
+    if (!mapContainer) return;
+
+    const map = L.map('leaflet-map').setView([17.35, 104.2], 8);
+
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      attribution: '&copy; OpenStreetMap contributors'
+    }).addTo(map);
+
+    const minLat = 16.0;
+    const maxLat = 18.8;
+    const minLon = 103.0;
+    const maxLon = 105.2;
+
+    const latStep = 0.05;
+    const lonStep = 0.05;
+
+    const values = stations.map(s => {
+      const pred = allPredictions[s.id];
+      return pred?.return_levels?.[`${selectedPeriod}_year`] ?? 0;
+    }).filter(v => v > 0);
+
+    const minVal = Math.min(...values) || 100;
+    const maxVal = Math.max(...values) || 300;
+
+    const calculateIDW = (lat, lon) => {
+      let sumWeights = 0;
+      let sumWeightedValues = 0;
+
+      for (let i = 0; i < stations.length; i++) {
+        const s = stations[i];
+        const pred = allPredictions[s.id];
+        const val = pred?.return_levels?.[`${selectedPeriod}_year`] ?? 0;
+        
+        const d = Math.sqrt(Math.pow(lat - s.latitude, 2) + Math.pow(lon - s.longitude, 2));
+        
+        if (d < 0.001) return val;
+        
+        const w = 1.0 / Math.pow(d, 2);
+        sumWeights += w;
+        sumWeightedValues += w * val;
+      }
+
+      return sumWeightedValues / sumWeights;
+    };
+
+    const getColorForValue = (val) => {
+      const t = Math.max(0, Math.min(1, (val - minVal) / (maxVal - minVal || 1)));
+      const hue = 240 - t * 240;
+      return `hsla(${hue}, 90%, 50%, 0.45)`;
+    };
+
+    const gridGroup = L.layerGroup();
+    for (let lat = minLat; lat < maxLat; lat += latStep) {
+      for (let lon = minLon; lon < maxLon; lon += lonStep) {
+        const centerLat = lat + latStep / 2;
+        const centerLon = lon + lonStep / 2;
+        const val = calculateIDW(centerLat, centerLon);
+        const color = getColorForValue(val);
+
+        L.rectangle(
+          [[lat, lon], [lat + latStep, lon + lonStep]],
+          {
+            color: 'transparent',
+            fillColor: color,
+            fillOpacity: 0.45,
+            interactive: false
+          }
+        ).addTo(gridGroup);
+      }
+    }
+    gridGroup.addTo(map);
+
+    const markersGroup = L.layerGroup();
+    stations.forEach(s => {
+      const pred = allPredictions[s.id];
+      const val = pred?.return_levels?.[`${selectedPeriod}_year`] ?? 0;
+      
+      const marker = L.circleMarker([s.latitude, s.longitude], {
+        radius: 8,
+        fillColor: '#ef4444',
+        color: '#ffffff',
+        weight: 2,
+        opacity: 1,
+        fillOpacity: 1
+      });
+
+      const popupContent = `
+        <div style="font-family: sans-serif; font-size: 12px; line-height: 1.4;">
+          <h4 style="margin: 0 0 5px 0; font-weight: bold; color: #1e293b;">${s.name}</h4>
+          <p style="margin: 0; color: #64748b;"><b>ฝนสุดขีด (${selectedPeriod} ปี):</b> <span style="color: #3b82f6; font-weight: bold;">${val.toFixed(2)} มม.</span></p>
+          <p style="margin: 3px 0 0 0; color: #64748b;"><b>ความเสี่ยง:</b> <span style="font-weight: bold;">${val > 200 ? 'สูง (High)' : (val >= 120 ? 'ปานกลาง (Medium)' : 'ต่ำ (Low)')}</span></p>
+        </div>
+      `;
+      marker.bindPopup(popupContent);
+      marker.addTo(markersGroup);
+    });
+    markersGroup.addTo(map);
+
+    const LegendControl = L.Control.extend({
+      options: { position: 'bottomright' },
+      onAdd: function() {
+        const div = L.DomUtil.create('div', 'info legend');
+        div.style.backgroundColor = 'white';
+        div.style.padding = '10px';
+        div.style.border = '1px solid #e2e8f0';
+        div.style.borderRadius = '12px';
+        div.style.boxShadow = '0 1px 3px rgba(0,0,0,0.1)';
+        div.style.fontFamily = 'sans-serif';
+        div.style.fontSize = '11px';
+        div.style.lineHeight = '18px';
+        div.style.color = '#334155';
+
+        let html = `<h5 style="margin: 0 0 6px 0; font-weight: bold; font-size: 11px;">ปริมาณฝนสุดขีด (มม.)</h5>`;
+        html += `<div style="background: linear-gradient(to right, hsla(240, 90%, 50%, 0.8), hsla(180, 90%, 50%, 0.8), hsla(120, 90%, 50%, 0.8), hsla(60, 90%, 50%, 0.8), hsla(0, 90%, 50%, 0.8)); height: 12px; width: 120px; border-radius: 4px; margin-bottom: 5px;"></div>`;
+        html += `<div style="display: flex; justify-content: space-between; font-weight: bold; width: 120px;">
+          <span>${minVal.toFixed(0)}</span>
+          <span>${((minVal + maxVal)/2).toFixed(0)}</span>
+          <span>${maxVal.toFixed(0)}</span>
+        </div>`;
+
+        div.innerHTML = html;
+        return div;
+      }
+    });
+    new LegendControl().addTo(map);
+
+    return () => {
+      map.remove();
+    };
+  }, [activePage, allPredictions, selectedPeriod, stations]);
 
   const getRiskLevel = (rainfall) => {
     if (rainfall > 200) return { level: 'สูง (High)', color: 'bg-red-500', text: 'text-red-600', bgLight: 'bg-red-50', border: 'border-red-200' };
@@ -412,43 +576,40 @@ export default function App() {
     const currentStationObj = stations.find(s => s.id === selectedStation) || stations[0];
     const lat = currentStationObj.latitude || 17.3571;
     const lon = currentStationObj.longitude || 104.8086;
-    
-    const offset = 0.5;
-    const bbox = `${lon - offset},${lat - offset},${lon + offset},${lat + offset}`;
-    const mapSrc = `https://www.openstreetmap.org/export/embed.html?bbox=${bbox}&layer=mapnik&marker=${lat},${lon}`;
 
     return (
       <div className="space-y-6 animate-in slide-in-from-bottom duration-500">
         <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 relative overflow-hidden h-[600px] flex flex-col">
           <div className="flex justify-between items-center mb-4">
-            <h3 className="font-bold text-slate-800 text-lg flex items-center gap-2"><MapIcon className="w-6 h-6 text-blue-500"/> แผนที่ความเสี่ยงอุทกวิทยา (Risk Map)</h3>
+            <h3 className="font-bold text-slate-800 text-lg flex items-center gap-2">
+              <MapIcon className="w-6 h-6 text-blue-500" /> แผนที่ความเสี่ยงอุทกวิทยา (IDW Risk Map)
+            </h3>
             <div className="flex gap-4 items-center">
-              <span className="text-sm text-slate-500">แผนที่แบบ Interactive แสดงจุดพิกัดสถานี</span>
+              <label className="text-xs font-bold text-slate-500">คาบปีฝนสุดขีด (Return Period):</label>
+              <select
+                value={selectedPeriod}
+                onChange={e => setSelectedPeriod(Number(e.target.value))}
+                className="bg-slate-50 border border-slate-200 rounded-lg px-2 py-1 text-xs font-bold text-slate-700 focus:outline-none cursor-pointer"
+              >
+                {returnPeriods.map(p => <option key={p} value={p}>{p} ปี</option>)}
+              </select>
             </div>
           </div>
           
           <div className="w-full flex-1 rounded-xl border border-slate-200 overflow-hidden relative z-0">
-             <iframe 
-               width="100%" 
-               height="100%" 
-               frameBorder="0" 
-               scrolling="no" 
-               marginHeight="0" 
-               marginWidth="0" 
-               src={mapSrc}
-               style={{ border: 'none' }}
-               title="Interactive Risk Map"
-             ></iframe>
+             <div id="leaflet-map" className="w-full h-full" style={{ minHeight: '380px' }}></div>
           </div>
           
           <div className="mt-4 bg-slate-50 p-4 rounded-xl border border-slate-100 flex items-center justify-between">
              <div>
-               <p className="font-bold text-slate-800 text-sm">{currentStationObj.name}</p>
-               <p className="text-xs text-slate-500 mt-1">ละติจูด: {lat} | ลองจิจูด: {lon}</p>
+               <p className="font-bold text-slate-800 text-sm">การประมวลผลเชิงพื้นที่ (Spatial Interpolation)</p>
+               <p className="text-xs text-slate-500 mt-1">แสดงผลเกรเดียนความเสี่ยงตามแบบจำลองคณิตศาสตร์ IDW (กำลัง 2) ของพื้นที่ 4 จังหวัดอีสานเหนือ</p>
              </div>
              <div className="text-right">
-                <p className="text-xs text-slate-500 mb-1">ระดับความเสี่ยงปัจจุบัน (รอบ {selectedPeriod} ปี)</p>
-                <div className={`text-xs font-bold px-3 py-1.5 rounded-full inline-block ${riskInfo.bgLight} ${riskInfo.text}`}>{riskInfo.level}</div>
+                <p className="text-xs text-slate-500 mb-1">คาบความเสี่ยงที่แสดง</p>
+                <div className="text-xs font-bold px-3 py-1.5 rounded-full inline-block bg-blue-50 text-blue-600 border border-blue-100">
+                  รอบ {selectedPeriod} ปี
+                </div>
              </div>
           </div>
         </div>
