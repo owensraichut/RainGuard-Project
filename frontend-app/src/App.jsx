@@ -177,9 +177,9 @@ export default function App() {
     const latStep = 0.05;
     const lonStep = 0.05;
 
-    // สเกลสีแบบคงที่ (Absolute Scale: 90 - 310 มม.) เพื่อให้สีบนแผนที่เปลี่ยนความแดงเข้มขึ้นตามคาบปีจริง
-    const minVal = 90;
-    const maxVal = 310;
+    // สเกลสีแบบคงที่ตามข้อกำหนดของผู้ใช้ (Absolute Scale: 104 - 312 มม.) เพื่อแสดงความต่างในทุกคาบปี
+    const minVal = 104;
+    const maxVal = 312;
 
     const calculateIDW = (lat, lon) => {
       let sumWeights = 0;
