@@ -158,15 +158,6 @@ def get_latest_alert(station_id: str) -> dict | None:
     ).fetchone()
     return dict(row) if row else None
 
-
-def save_alert(station_id: str, generated_at: str, risk_level: str, message: str, return_100: float) -> None:
-    with connection:
-        connection.execute(
-            "INSERT INTO alerts (station_id, generated_at, risk_level, message, return_100) VALUES (?, ?, ?, ?, ?)",
-            (station_id, generated_at, risk_level, message, return_100),
-        )
-
-
 def save_alert_if_needed(station_id: str, risk_level: str, message: str, return_100: float) -> None:
     last = get_latest_alert(station_id)
     should_save = False
@@ -175,7 +166,7 @@ def save_alert_if_needed(station_id: str, risk_level: str, message: str, return_
         should_save = True
     elif last["risk_level"] != risk_level:
         should_save = True
-    elif return_100 > float(last.get("return_100", 0.0)):
+    elif return_100 > float(last.get("return_100") or 0.0):
         should_save = True
 
     if should_save:
