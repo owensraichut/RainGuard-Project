@@ -613,32 +613,82 @@ export default function App() {
     );
   };
 
-  const renderAdvisory = () => (
-    <div className="space-y-6 animate-in slide-in-from-right duration-500">
-        <div className="bg-green-600 rounded-2xl p-8 text-white relative overflow-hidden">
-            <div className="relative z-10">
-                <h3 className="text-2xl font-bold mb-2">คำแนะนำการวางแผนเพาะปลูก</h3>
-                <p className="text-green-100 text-sm">อ้างอิงตามระดับความเสี่ยง {predictionData?.station_name}</p>
-            </div>
-            <Leaf className="absolute right-[-20px] bottom-[-20px] w-48 h-48 text-green-500 opacity-20" />
+  const renderAdvisory = () => {
+    const fieldCrops = [
+      { title: 'ข้าวนาปี', icon: '🌾', vulnerability: 'ปานกลาง', advice: 'ควรเลือกใช้พันธุ์ข้าวที่ทนน้ำท่วมฉับพลัน (เช่น พันธุ์ข้าวทนน้ำท่วม หรือข้าวมะลิ กข6) หลีกเลี่ยงการหว่านข้าวในช่วงพฤษภาคม-สิงหาคมที่มีโอกาสเกิดฝนสุดขีดสูง', color: 'border-amber-200 text-amber-600 bg-amber-50' },
+      { title: 'อ้อย', icon: '🎋', vulnerability: 'ต่ำ', advice: 'ทนต่อสภาวะน้ำขังได้ดีกว่าพืชไร่อื่นๆ แต่ควรทำระบบร่องระบายน้ำรอบแปลง และระวังดินสไลด์พังทลายหากปลูกในพื้นที่ลาดชันช่วงฝนชุก', color: 'border-emerald-200 text-emerald-600 bg-emerald-50' },
+      { title: 'มันสำปะหลัง', icon: '🥔', vulnerability: 'สูงมาก', advice: 'ไม่ทนต่อน้ำท่วมขังเด็ดขาด (หัวจะเน่าเสียหายภายใน 3 วัน) ควรย้ายไปปลูกในพื้นที่ดอน หรือเลื่อนการเก็บเกี่ยวและปลูกใหม่เพื่อหลบช่วงฤดูฝนสุดขีด', color: 'border-red-200 text-red-600 bg-red-50' },
+      { title: 'ข้าวโพดเลี้ยงสัตว์', icon: '🌽', vulnerability: 'สูง', advice: 'อ่อนแอต่อดินแฉะและน้ำขังในระยะต้นกล้า ควรยกแปลงร่องระบายน้ำสูง 20-30 ซม. เพื่อป้องกันน้ำขังโคนต้น และหลีกเลี่ยงการเพาะปลูกในเดือนที่ฝนตกชุกที่สุด', color: 'border-orange-200 text-orange-600 bg-orange-50' },
+    ];
+
+    const vegetableCrops = [
+      { title: 'พริกและกะเพรา', icon: '🌶️', vulnerability: 'สูงมาก', advice: 'รากเน่าและใบร่วงพังทลายได้ง่ายเมื่อดินชุ่มน้ำเกินไป แนะนำให้ยกร่องสูง 30-40 ซม. คลุมพลาสติกหน้าดินเพื่อลดแรงกระแทกจากน้ำฝนชุกและป้องกันการสูญเสียปุ๋ย', color: 'border-red-200 text-red-600 bg-red-50' },
+      { title: 'ผักคะน้าและกะหล่ำปลี', icon: '🥬', vulnerability: 'ปานกลาง', advice: 'ทนทานฝนได้พอสมควร แต่ระวังโรคเน่าคอดินและโรคราน้ำค้าง ควรโรยปูนขาวเพื่อลดความเป็นกรดของดินแฉะ และพ่นสารชีวภัณฑ์บำรุงเป็นประจำ', color: 'border-emerald-200 text-emerald-600 bg-emerald-50' },
+      { title: 'มะเขือเทศและแตงกวา', icon: '🍅', vulnerability: 'สูง', advice: 'ฝนตกกระแทกหนักจะทำให้ดอกร่วงและผลแตกเสียหายง่าย ควรสร้างค้างให้แข็งแรง ปลูกใต้โรงเรือนพลาสติกชั่วคราว หรือใช้ตาข่ายพรางแสงช่วยลดแรงกระแทกของน้ำฝน', color: 'border-orange-200 text-orange-600 bg-orange-50' },
+      { title: 'หอมแดงและกระเทียม', icon: '🧅', vulnerability: 'สูงมาก', advice: 'หัวเน่าเสียหายรวดเร็วหากมีน้ำแช่ขังดิน ควรปลูกบนแปลงร่องยกสูงมากผสมดินทรายเพื่อเพิ่มการระบายน้ำ และแนะนำให้คลุมด้วยฟางแห้งเพื่อรักษาความชื้นแบบพอดี', color: 'border-red-200 text-red-600 bg-red-50' },
+    ];
+
+    return (
+      <div className="space-y-8 animate-in slide-in-from-right duration-500">
+        {/* Banner */}
+        <div className="bg-gradient-to-r from-green-600 to-emerald-700 rounded-2xl p-8 text-white relative overflow-hidden shadow-md shadow-green-100">
+          <div className="relative z-10 max-w-xl">
+            <h3 className="text-2xl font-bold mb-2">คำแนะนำและคู่มือการเกษตรอัจฉริยะ</h3>
+            <p className="text-green-100 text-sm leading-relaxed">
+              วิเคราะห์ความล่อแหลมและให้คำแนะนำในการจัดการแปลงเกษตรทั้ง <b>กลุ่มพืชไร่เศรษฐกิจ</b> และ <b>กลุ่มพืชผักสวนครัว</b> ตามสถิติความเสี่ยงน้ำท่วมของสถานี {predictionData?.station_name}
+            </p>
+          </div>
+          <Leaf className="absolute right-[-20px] bottom-[-20px] w-48 h-48 text-green-400 opacity-20 rotate-12" />
         </div>
-        
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            {[
-                { title: 'ข้าวนาปี', icon: '🌾', risk: 'สูง', advice: 'ควรเลี่ยงช่วงเดือนที่มีโอกาสฝนสุดขีดเกิน 200 มม. และเน้นพันธุ์ข้าวทนน้ำท่วมฉับพลัน' },
-                { title: 'อ้อย', icon: '🎋', risk: 'ปานกลาง', advice: 'เน้นการทำทางระบายน้ำรอบแปลง และไม่ควรปลูกในพื้นที่ลุ่มต่ำที่มีประวัติน้ำท่วมขัง' },
-                { title: 'มันสำปะหลัง', icon: '🥔', risk: 'สูง', advice: 'เป็นพืชไม่ทนน้ำขัง หากคาดการณ์ฝนสูงควรเลื่อนการปลูกหรือย้ายไปพื้นที่ดอน' },
-            ].map((item, idx) => (
-                <div key={idx} className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm hover:border-green-300 transition-colors">
-                    <span className="text-4xl mb-4 block">{item.icon}</span>
-                    <h5 className="font-bold text-slate-800 text-lg mb-2">{item.title}</h5>
-                    <div className="mb-4 inline-block px-2 py-1 bg-red-100 text-red-600 text-[10px] rounded font-bold">ความเสี่ยง: {item.risk}</div>
-                    <p className="text-sm text-slate-600 leading-relaxed">{item.advice}</p>
+
+        {/* Section 1: พืชไร่ */}
+        <div className="space-y-4">
+          <div className="flex items-center gap-2 pb-2 border-b border-slate-200">
+            <span className="text-2xl">🌾</span>
+            <h4 className="text-lg font-bold text-slate-800">กลุ่มพืชไร่เศรษฐกิจ (Field Crops)</h4>
+            <span className="text-xs text-slate-400 font-normal ml-2">พืชอายุสั้นและพืชอุตสาหกรรมในพื้นที่กว้าง</span>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+            {fieldCrops.map((item, idx) => (
+              <div key={idx} className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm hover:border-green-300 hover:shadow-md transition-all duration-200 flex flex-col justify-between">
+                <div>
+                  <span className="text-4xl mb-4 block">{item.icon}</span>
+                  <h5 className="font-bold text-slate-800 text-base mb-1">{item.title}</h5>
+                  <div className={`mb-3 inline-block px-2.5 py-0.5 rounded-full text-[10px] font-bold border ${item.color}`}>
+                    ความเปราะบาง: {item.vulnerability}
+                  </div>
+                  <p className="text-xs text-slate-600 leading-relaxed font-normal">{item.advice}</p>
                 </div>
+              </div>
             ))}
+          </div>
         </div>
-    </div>
-  );
+
+        {/* Section 2: พืชผักสวนครัว */}
+        <div className="space-y-4">
+          <div className="flex items-center gap-2 pb-2 border-b border-slate-200">
+            <span className="text-2xl">🥬</span>
+            <h4 className="text-lg font-bold text-slate-800">กลุ่มพืชผักสวนครัว (Kitchen Garden Vegetables)</h4>
+            <span className="text-xs text-slate-400 font-normal ml-2">พืชผักโตไว ความเปราะบางสูงจากปริมาณฝนชุก</span>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+            {vegetableCrops.map((item, idx) => (
+              <div key={idx} className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm hover:border-emerald-300 hover:shadow-md transition-all duration-200 flex flex-col justify-between">
+                <div>
+                  <span className="text-4xl mb-4 block">{item.icon}</span>
+                  <h5 className="font-bold text-slate-800 text-base mb-1">{item.title}</h5>
+                  <div className={`mb-3 inline-block px-2.5 py-0.5 rounded-full text-[10px] font-bold border ${item.color}`}>
+                    ความเปราะบาง: {item.vulnerability}
+                  </div>
+                  <p className="text-xs text-slate-600 leading-relaxed font-normal">{item.advice}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    );
+  };
 
   const renderAlerts = () => (
     <div className="space-y-4 animate-in slide-in-from-bottom duration-500">
