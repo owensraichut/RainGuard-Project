@@ -415,6 +415,18 @@ export default function App() {
   // PAGE RENDERERS
   // ==========================================
 
+  // ข้อมูลงานวิจัย (จากบทความ: การเปลี่ยนแปลงการใช้ที่ดิน อ.ธาตุพนม จ.นครพนม)
+  const researchData = {
+    title: "การเปลี่ยนแปลงการใช้ที่ดินริมโขง อ.ธาตุพนม จ.นครพนม",
+    source: "วารสารวิทยาศาสตร์และเทคโนโลยี ม.อุบลราชธานี ปี 2562",
+    landUseChanges: [
+      { period: "2538–2547", agri: -32.50, forest: -17.50, water: +19.54, misc: +20.79, label: "ก่อนพัฒนาลุ่มโขง" },
+      { period: "2547–2560", agri: -6.24, forest: -11.42, water: -32.34, misc: +43.51, label: "หลังพัฒนาลุ่มโขง" },
+    ],
+    accuracy: [{ year: "2538", pct: 85.31 }, { year: "2547", pct: 88.81 }, { year: "2560", pct: 92.30 }],
+    insight: "ตลิ่งถูกกัดเซาะส่งผลให้พื้นที่เกษตรริมโขงลดลงต่อเนื่อง เกษตรกรเปลี่ยนจากผลิตเพื่อยังชีพ มาเป็นเชิงพาณิชย์ ใช้ทุนและเทคโนโลยีสูงขึ้น"
+  };
+
   const renderHome = () => (
     <div className="space-y-6 animate-in fade-in duration-500">
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -480,6 +492,72 @@ export default function App() {
           </div>
           <div className="mt-4 pt-4 border-t border-slate-100">
              <button onClick={() => changePage('advisory')} className="w-full py-2 bg-slate-900 text-white rounded-xl text-sm font-medium hover:bg-slate-800 transition-colors">ดูคำแนะนำการเกษตร</button>
+          </div>
+        </div>
+      </div>
+
+      {/* === Research Context Panel === */}
+      <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+        <div className="bg-gradient-to-r from-indigo-600 to-blue-600 p-5 flex items-center gap-3">
+          <div className="bg-white/20 rounded-xl p-2">
+            <FileText className="w-5 h-5 text-white" />
+          </div>
+          <div>
+            <h4 className="font-bold text-white text-sm">บริบทงานวิจัย: {researchData.title}</h4>
+            <p className="text-indigo-200 text-xs mt-0.5">{researchData.source}</p>
+          </div>
+        </div>
+        <div className="p-5">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-5">
+            {/* Land use change stats */}
+            {researchData.landUseChanges.map((item, i) => (
+              <div key={i} className="bg-slate-50 rounded-xl p-4 border border-slate-100">
+                <div className="flex items-center justify-between mb-3">
+                  <span className="text-xs font-bold text-slate-600">{item.period}</span>
+                  <span className="text-[10px] bg-indigo-50 text-indigo-600 px-2 py-0.5 rounded-full font-medium border border-indigo-100">{item.label}</span>
+                </div>
+                <div className="space-y-1.5">
+                  <div className="flex justify-between text-xs">
+                    <span className="text-slate-500">🌾 เกษตรกรรม</span>
+                    <span className={`font-bold ${item.agri < 0 ? 'text-red-500' : 'text-emerald-500'}`}>{item.agri > 0 ? '+' : ''}{item.agri}%</span>
+                  </div>
+                  <div className="flex justify-between text-xs">
+                    <span className="text-slate-500">🌳 ป่าไม้</span>
+                    <span className={`font-bold ${item.forest < 0 ? 'text-red-500' : 'text-emerald-500'}`}>{item.forest > 0 ? '+' : ''}{item.forest}%</span>
+                  </div>
+                  <div className="flex justify-between text-xs">
+                    <span className="text-slate-500">💧 แหล่งน้ำ</span>
+                    <span className={`font-bold ${item.water < 0 ? 'text-red-500' : 'text-blue-500'}`}>{item.water > 0 ? '+' : ''}{item.water}%</span>
+                  </div>
+                  <div className="flex justify-between text-xs">
+                    <span className="text-slate-500">🏗️ เบ็ดเตล็ด</span>
+                    <span className={`font-bold ${item.misc > 0 ? 'text-orange-500' : 'text-emerald-500'}`}>{item.misc > 0 ? '+' : ''}{item.misc}%</span>
+                  </div>
+                </div>
+              </div>
+            ))}
+            {/* Accuracy panel */}
+            <div className="bg-slate-50 rounded-xl p-4 border border-slate-100">
+              <div className="text-xs font-bold text-slate-600 mb-3">ความถูกต้องแผนที่ดาวเทียม</div>
+              <div className="space-y-2">
+                {researchData.accuracy.map((a, i) => (
+                  <div key={i}>
+                    <div className="flex justify-between text-xs mb-1">
+                      <span className="text-slate-500">ปี {a.year}</span>
+                      <span className="font-bold text-indigo-600">{a.pct}%</span>
+                    </div>
+                    <div className="w-full bg-slate-200 rounded-full h-1.5">
+                      <div className="bg-indigo-500 h-1.5 rounded-full" style={{ width: `${a.pct}%` }}></div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+              <div className="mt-3 text-[10px] text-slate-400">Landsat 5 (2538, 2547) + Sentinel-2 (2560) | OBIA method</div>
+            </div>
+          </div>
+          <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 flex gap-3">
+            <AlertTriangle className="w-5 h-5 text-amber-500 flex-shrink-0 mt-0.5" />
+            <p className="text-xs text-amber-800 leading-relaxed"><b>ข้อค้นพบสำคัญ:</b> {researchData.insight}</p>
           </div>
         </div>
       </div>
@@ -686,21 +764,74 @@ export default function App() {
             ))}
           </div>
         </div>
+
+        {/* Section 3: พืชริมฝั่งโขง (จากงานวิจัย) */}
+        <div className="space-y-4">
+          <div className="flex items-center gap-2 pb-2 border-b border-indigo-100">
+            <span className="text-2xl">🏞️</span>
+            <h4 className="text-lg font-bold text-slate-800">กลุ่มพืชสวนริมฝั่งแม่น้ำโขง (Mekong Riverside Crops)</h4>
+            <span className="text-xs bg-indigo-50 text-indigo-600 font-medium ml-2 px-2 py-0.5 rounded-full border border-indigo-100">ข้อมูลจากงานวิจัย อ.ธาตุพนม จ.นครพนม</span>
+          </div>
+          <div className="bg-indigo-50 border border-indigo-100 rounded-xl p-4 text-xs text-indigo-800 flex gap-3 items-start">
+            <Info className="w-4 h-4 flex-shrink-0 mt-0.5 text-indigo-500" />
+            <span>พืชเหล่านี้เป็นพืชที่เกษตรกรริมฝั่งโขงนิยมปลูกในช่วงหน้าแล้ง (ม.ค.–เม.ย.) บนตลิ่งที่น้ำลด เป็นการเกษตรเชิงพาณิชย์ที่มีความเสี่ยงสูงต่อน้ำท่วมฉับพลันในฤดูฝน ควรวางแผนตามคาบอุทกภัยของสถานีใกล้เคียง</span>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {[
+              { title: 'กะหล่ำปลี', icon: '🥦', vulnerability: 'ปานกลาง', season: 'ม.ค.–มี.ค.', advice: 'ปลูกได้ดีในช่วงหน้าแล้งบนดินตะกอนริมฝั่ง ควรเฝ้าระวังน้ำหลากในเดือนมีนาคม-เมษายน หากพยากรณ์มีฝนมาก ควรเร่งเก็บเกี่ยวก่อนกำหนด', color: 'border-emerald-200 text-emerald-600 bg-emerald-50' },
+              { title: 'ผักกาดขาวและคะน้า', icon: '🥬', vulnerability: 'ปานกลาง', season: 'ม.ค.–มี.ค.', advice: 'อายุเก็บเกี่ยวสั้น 45–60 วัน เหมาะสมกับพื้นที่ริมโขงที่ถูกน้ำท่วมตามฤดูกาล ควรวางแผนให้เก็บเกี่ยวก่อนฤดูฝนน้ำหลาก', color: 'border-emerald-200 text-emerald-600 bg-emerald-50' },
+              { title: 'ผักชี', icon: '🌿', vulnerability: 'สูง', season: 'ธ.ค.–ก.พ.', advice: 'ทนความชื้นสูงได้น้อย ฝนตกหนักทำให้เน่าเสียหายรวดเร็ว ควรปลูกเฉพาะช่วงหน้าหนาวแล้งจัด และไม่ควรปลูกหากพยากรณ์อุทกภัยมีความน่าจะเป็นสูง', color: 'border-orange-200 text-orange-600 bg-orange-50' },
+              { title: 'แตงกวา', icon: '🥒', vulnerability: 'สูง', season: 'ม.ค.–มี.ค.', advice: 'ผลแตกง่ายเมื่อได้รับน้ำไม่สม่ำเสมอ น้ำท่วมฉับพลันทำให้รากเน่า แนะนำยกแปลงสูง 30 ซม. และติดตามพยากรณ์น้ำโขงในฤดูเปลี่ยนผ่าน', color: 'border-orange-200 text-orange-600 bg-orange-50' },
+              { title: 'พืชตะกอนทั่วไป (ยังชีพ→พาณิชย์)', icon: '🌱', vulnerability: 'ตามฤดูกาล', season: 'ทั้งปี', advice: 'งานวิจัยพบว่าเกษตรกรเปลี่ยนจากผลิตเพื่อยังชีพ (ปุ๋ยธรรมชาติ ไม่ใช้สารเคมี) มาเป็นพาณิชย์ ใช้ทุนสูงขึ้น ควรวางแผนประกันความเสี่ยงและเลือกพันธุ์ทนน้ำ', color: 'border-slate-200 text-slate-600 bg-slate-50' },
+              { title: 'ความเสี่ยงจากการกัดเซาะตลิ่ง', icon: '⚠️', vulnerability: 'สูงมาก', season: 'พ.ค.–ต.ค.', advice: 'งานวิจัยพบว่าพื้นที่เกษตรริมโขงลดลง 32.50% ในช่วง 2538–2547 และ 6.24% ในช่วง 2547–2560 เนื่องจากตลิ่งพัง ควรหลีกเลี่ยงปลูกพืชใกล้ตลิ่งในช่วงน้ำหลาก', color: 'border-red-200 text-red-600 bg-red-50' },
+            ].map((item, idx) => (
+              <div key={idx} className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm hover:border-indigo-300 hover:shadow-md transition-all duration-200 flex flex-col justify-between">
+                <div>
+                  <div className="flex items-start justify-between mb-3">
+                    <span className="text-4xl">{item.icon}</span>
+                    <span className="text-[10px] text-indigo-500 bg-indigo-50 border border-indigo-100 px-2 py-0.5 rounded-full font-medium">{item.season}</span>
+                  </div>
+                  <h5 className="font-bold text-slate-800 text-base mb-1">{item.title}</h5>
+                  <div className={`mb-3 inline-block px-2.5 py-0.5 rounded-full text-[10px] font-bold border ${item.color}`}>
+                    ความเปราะบาง: {item.vulnerability}
+                  </div>
+                  <p className="text-xs text-slate-600 leading-relaxed font-normal">{item.advice}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
       </div>
     );
+  };
+
+  const handleAlertClick = (alert) => {
+    // หาสถานีที่ตรงกับการแจ้งเตือน แล้วเลือกและพาไปหน้าหลัก
+    const matchedStation = stations.find(s => s.name === alert.station_name || s.id === alert.station_id);
+    if (matchedStation) {
+      setSelectedStation(matchedStation.id);
+    }
+    changePage('home');
   };
 
   const renderAlerts = () => (
     <div className="space-y-4 animate-in slide-in-from-bottom duration-500">
         <h3 className="text-xl font-bold text-slate-800">ประวัติการแจ้งเตือนทั้งหมด</h3>
+        <p className="text-sm text-slate-500">คลิกที่การแจ้งเตือนเพื่อดูกราฟ GEV และข้อมูลสถิติของสถานีนั้น</p>
         <div className="space-y-3">
             {!alerts || alerts.length === 0 ? (
-              <div className="bg-white p-8 rounded-2xl border border-slate-200 text-center text-slate-400">
-                ไม่มีประวัติการแจ้งเตือน
+              <div className="bg-white p-8 rounded-2xl border border-slate-200 text-center">
+                <Bell className="w-10 h-10 text-slate-200 mx-auto mb-3" />
+                <p className="text-slate-400 font-medium">ไม่มีประวัติการแจ้งเตือน</p>
+                <p className="text-slate-300 text-xs mt-1">ระบบจะแจ้งเตือนเมื่อพบความเสี่ยงสูงในสถานีใด</p>
               </div>
             ) : (
               alerts.map(alert => (
-                  <div key={alert.id} className="bg-white p-4 rounded-xl border border-slate-200 flex items-start gap-4 hover:bg-slate-50 transition-colors cursor-pointer">
+                  <div
+                    key={alert.id}
+                    onClick={() => handleAlertClick(alert)}
+                    className="bg-white p-4 rounded-xl border border-slate-200 flex items-start gap-4 hover:bg-blue-50 hover:border-blue-200 hover:shadow-md transition-all duration-200 cursor-pointer group"
+                  >
                       <div className={`p-3 rounded-full ${alert.risk_level === 'High' ? 'bg-red-100 text-red-600' : 'bg-yellow-100 text-yellow-600'}`}>
                           <AlertTriangle className="w-6 h-6" />
                       </div>
@@ -710,8 +841,9 @@ export default function App() {
                               <span className="text-[10px] text-slate-400">{new Date(alert.generated_at).toLocaleString('th-TH')}</span>
                           </div>
                           <p className="text-sm text-slate-600">{alert.message}</p>
+                          <p className="text-xs text-blue-500 mt-2 font-medium group-hover:underline">→ ดูกราฟ GEV และสถิติสถานีนี้</p>
                       </div>
-                      <ChevronRight className="w-5 h-5 text-slate-300 self-center" />
+                      <ChevronRight className="w-5 h-5 text-slate-300 self-center group-hover:text-blue-400 transition-colors" />
                   </div>
               ))
             )}
