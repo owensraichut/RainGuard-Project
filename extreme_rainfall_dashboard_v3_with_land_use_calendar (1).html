@@ -1,0 +1,495 @@
+
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:var(--font-sans);font-size:13px;background:var(--color-background-primary)}
+.topbar{padding:10px 14px;border-bottom:.5px solid var(--color-border-tertiary);display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:6px}
+.app-title{font-size:14px;font-weight:500;color:var(--color-text-primary)}
+.app-sub{font-size:11px;color:var(--color-text-secondary);margin-top:1px}
+.badge{font-size:10px;padding:2px 8px;border-radius:var(--border-radius-md);background:var(--color-background-info);color:var(--color-text-info)}
+.nav{display:flex;gap:3px;padding:8px 14px;border-bottom:.5px solid var(--color-border-tertiary);flex-wrap:wrap}
+.tab{font-size:11px;padding:4px 10px;border-radius:var(--border-radius-md);border:.5px solid var(--color-border-secondary);background:transparent;color:var(--color-text-secondary);cursor:pointer;transition:all .15s;white-space:nowrap}
+.tab.active{background:var(--color-background-info);color:var(--color-text-info);border-color:var(--color-border-info)}
+.page{display:none;padding:12px 14px 20px}
+.page.active{display:block}
+.sec{font-size:10px;font-weight:500;color:var(--color-text-secondary);text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px}
+.row2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.row3{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+@media(max-width:520px){.row2,.row3{grid-template-columns:1fr}}
+.card{background:var(--color-background-secondary);border-radius:var(--border-radius-lg);padding:10px 12px}
+.card-b{background:var(--color-background-primary);border:.5px solid var(--color-border-tertiary);border-radius:var(--border-radius-lg);padding:10px 12px}
+.metrics{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:8px;margin-bottom:12px}
+.mc{background:var(--color-background-secondary);border-radius:var(--border-radius-md);padding:8px 10px}
+.mc-l{font-size:10px;color:var(--color-text-secondary);margin-bottom:2px}
+.mc-v{font-size:18px;font-weight:500;color:var(--color-text-primary)}
+.mc-u{font-size:10px;color:var(--color-text-secondary)}
+#map{height:300px;border-radius:var(--border-radius-lg);border:.5px solid var(--color-border-tertiary)}
+.cw{position:relative;width:100%;height:220px}
+.rb{font-size:10px;padding:2px 6px;border-radius:var(--border-radius-md)}
+.r-h{background:var(--color-background-danger);color:var(--color-text-danger)}
+.r-m{background:var(--color-background-warning);color:var(--color-text-warning)}
+.r-l{background:var(--color-background-success);color:var(--color-text-success)}
+.divider{height:.5px;background:var(--color-border-tertiary);margin:10px 0}
+.tw{overflow-x:auto;margin-bottom:12px}
+table{width:100%;border-collapse:collapse;font-size:11px}
+th{padding:5px 8px;color:var(--color-text-secondary);border-bottom:.5px solid var(--color-border-tertiary);font-weight:500;text-align:left;white-space:nowrap}
+td{padding:5px 8px;border-bottom:.5px solid var(--color-border-tertiary);color:var(--color-text-primary)}
+tr:last-child td{border-bottom:none}
+.tn{text-align:right;font-variant-numeric:tabular-nums}
+select{font-size:11px;padding:4px 8px;border-radius:var(--border-radius-md);border:.5px solid var(--color-border-secondary);background:var(--color-background-primary);color:var(--color-text-primary)}
+
+/* calendar */
+.cal-wrap{overflow-x:auto;margin-bottom:12px}
+.cal-grid{display:grid;grid-template-columns:120px repeat(12,1fr);gap:2px;min-width:600px}
+.cal-hdr{font-size:10px;color:var(--color-text-secondary);text-align:center;padding:4px 2px;font-weight:500}
+.cal-label{font-size:11px;color:var(--color-text-primary);padding:4px 6px;display:flex;align-items:center;gap:4px}
+.cal-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+.cal-cell{height:22px;border-radius:3px;opacity:.15;transition:opacity .15s}
+.cal-cell.on{opacity:1}
+.cal-cell.half{opacity:.5}
+.legend-cal{display:flex;flex-wrap:wrap;gap:10px;font-size:11px;color:var(--color-text-secondary);margin-bottom:10px}
+.legend-cal span{display:flex;align-items:center;gap:5px}
+.lbox{width:12px;height:12px;border-radius:3px}
+
+/* land use change */
+.lu-wrap{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:6px;margin-bottom:12px}
+.lu-card{background:var(--color-background-primary);border:.5px solid var(--color-border-tertiary);border-radius:var(--border-radius-md);padding:8px 10px}
+.lu-name{font-size:11px;color:var(--color-text-secondary);margin-bottom:4px}
+.lu-bar-wrap{display:flex;gap:3px;align-items:center;margin-bottom:3px}
+.lu-bar-bg{flex:1;height:6px;background:var(--color-background-tertiary);border-radius:99px;overflow:hidden}
+.lu-bar-fill{height:100%;border-radius:99px}
+.lu-pct{font-size:10px;color:var(--color-text-secondary);width:32px;text-align:right}
+.lu-year{font-size:10px;color:var(--color-text-tertiary)}
+.change-badge{font-size:10px;padding:1px 5px;border-radius:3px;margin-left:4px}
+.up{background:var(--color-background-success);color:var(--color-text-success)}
+.down{background:var(--color-background-danger);color:var(--color-text-danger)}
+
+/* impact */
+.impact-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:8px;margin-bottom:12px}
+.impact-card{background:var(--color-background-primary);border:.5px solid var(--color-border-tertiary);border-radius:var(--border-radius-lg);padding:10px 12px}
+.impact-icon{font-size:22px;margin-bottom:4px}
+.impact-title{font-size:12px;font-weight:500;color:var(--color-text-primary);margin-bottom:3px}
+.impact-text{font-size:11px;color:var(--color-text-secondary);line-height:1.5}
+.conn-arrow{text-align:center;font-size:18px;color:var(--color-text-tertiary);margin:4px 0}
+</style>
+
+<div class="topbar">
+  <div>
+    <div class="app-title">แดชบอร์ดน้ำฝนสุดขีด + การใช้ที่ดิน — ภาคอีสานตอนบน</div>
+    <div class="app-sub">นครพนม · สกลนคร · บึงกาฬ · มุกดาหาร | ข้อมูล พ.ศ. 2527–2568</div>
+  </div>
+  <div style="display:flex;gap:5px;flex-wrap:wrap">
+    <span class="badge">GEV Distribution</span>
+    <span class="badge" style="background:var(--color-background-success);color:var(--color-text-success)">OBIA Land Use</span>
+  </div>
+</div>
+
+<div class="nav">
+  <button class="tab active" onclick="go('overview')">ภาพรวม</button>
+  <button class="tab" onclick="go('map')">แผนที่</button>
+  <button class="tab" onclick="go('landuse')">การใช้ที่ดิน</button>
+  <button class="tab" onclick="go('calendar')">ปฏิทินเพาะปลูก</button>
+  <button class="tab" onclick="go('impact')">ผลกระทบ</button>
+  <button class="tab" onclick="go('alert')">แจ้งเตือน</button>
+</div>
+
+<!-- OVERVIEW -->
+<div class="page active" id="page-overview">
+  <div class="metrics">
+    <div class="mc"><div class="mc-l">Return Level 100 ปี (สูงสุด)</div><div class="mc-v">281.75</div><div class="mc-u">มม. · นครพนม สกษ.</div></div>
+    <div class="mc"><div class="mc-l">ฝนสูงสุดบันทึกได้</div><div class="mc-v">304.40</div><div class="mc-u">มม. · นครพนม</div></div>
+    <div class="mc"><div class="mc-l">พื้นที่เกษตรลดลง 2538–2560</div><div class="mc-v">934</div><div class="mc-u">ไร่ (จาก 6,092 → 5,158)</div></div>
+    <div class="mc"><div class="mc-l">เกษตรกรที่สัมภาษณ์</div><div class="mc-v">60</div><div class="mc-u">คน · อ.ธาตุพนม นครพนม</div></div>
+  </div>
+  <div class="sec">Return Level เปรียบเทียบ 6 สถานี</div>
+  <div style="display:flex;gap:8px;margin-bottom:8px"><select id="ovType"><option value="bar">แท่ง</option><option value="line">เส้น</option></select></div>
+  <div style="display:flex;flex-wrap:wrap;gap:8px;font-size:11px;color:var(--color-text-secondary);margin-bottom:6px" id="ovLeg"></div>
+  <div class="cw"><canvas id="ovChart" aria-label="กราฟ Return Level 6 สถานี"></canvas></div>
+  <div class="divider"></div>
+  <div class="sec">ตารางค่าระดับการเกิดซ้ำ (มม.)</div>
+  <div class="tw"><table><thead><tr><th>สถานี</th><th>จังหวัด</th><th class="tn">2 ปี</th><th class="tn">5 ปี</th><th class="tn">10 ปี</th><th class="tn">50 ปี</th><th class="tn">100 ปี</th><th>แจกแจง</th><th>ความเสี่ยง</th></tr></thead><tbody id="ovTbl"></tbody></table></div>
+</div>
+
+<!-- MAP -->
+<div class="page" id="page-map">
+  <div class="sec">แผนที่สถานีวัดฝน — ภาคอีสานตอนบน</div>
+  <div id="map" style="margin-bottom:10px"></div>
+  <div class="row2">
+    <div class="card-b">
+      <div class="sec">สัญลักษณ์ความเสี่ยง</div>
+      <div style="display:flex;flex-direction:column;gap:5px;font-size:11px">
+        <span><span style="color:#E24B4A;font-size:14px">●</span> ความเสี่ยงสูง (100ปี > 270 มม.)</span>
+        <span><span style="color:#EF9F27;font-size:14px">●</span> ความเสี่ยงปานกลาง (200–270 มม.)</span>
+        <span><span style="color:#639922;font-size:14px">●</span> ความเสี่ยงต่ำ (< 200 มม.)</span>
+      </div>
+    </div>
+    <div class="card-b">
+      <div class="sec">พื้นที่ธาตุพนม (งานวิจัย Land Use)</div>
+      <div style="font-size:11px;color:var(--color-text-secondary);line-height:1.7">
+        📍 อ.ธาตุพนม จ.นครพนม<br>
+        พื้นที่ศึกษา 345.66 ตร.กม.<br>
+        7 ตำบลติดแม่น้ำโขง<br>
+        สำรวจปี พ.ศ. 2538, 2547, 2560
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- LAND USE -->
+<div class="page" id="page-landuse">
+  <div class="sec">การเปลี่ยนแปลงการใช้ที่ดินริมแม่น้ำโขง อ.ธาตุพนม (ไร่)</div>
+  <div class="lu-wrap" id="luCards"></div>
+  <div class="divider"></div>
+  <div class="sec">กราฟเปรียบเทียบการใช้ที่ดิน 3 ช่วงปี</div>
+  <div class="cw" style="height:240px"><canvas id="luChart" aria-label="กราฟการใช้ที่ดิน 3 ปี"></canvas></div>
+  <div class="divider"></div>
+  <div class="sec">ตารางเปลี่ยนแปลงการใช้ที่ดิน ช่วง 2538–2547 (%)</div>
+  <div class="tw"><table>
+    <thead><tr><th>ประเภทที่ดิน</th><th class="tn">2538 (ไร่)</th><th class="tn">2547 (ไร่)</th><th class="tn">2560 (ไร่)</th><th class="tn">เปลี่ยน 38-47</th><th class="tn">เปลี่ยน 47-60</th></tr></thead>
+    <tbody>
+      <tr><td>แหล่งน้ำ</td><td class="tn">10,169</td><td class="tn">10,656</td><td class="tn">10,013</td><td class="tn"><span class="change-badge up">+19.54%</span></td><td class="tn"><span class="change-badge down">-32.34%</span></td></tr>
+      <tr><td>เกษตรกรรม</td><td class="tn">6,092</td><td class="tn">5,252</td><td class="tn">5,158</td><td class="tn"><span class="change-badge down">-32.50%</span></td><td class="tn"><span class="change-badge down">-6.24%</span></td></tr>
+      <tr><td>อยู่อาศัย/สิ่งปลูกสร้าง</td><td class="tn">1,992</td><td class="tn">2,233</td><td class="tn">2,362</td><td class="tn"><span class="change-badge up">+9.67%</span></td><td class="tn"><span class="change-badge up">+6.45%</span></td></tr>
+      <tr><td>ป่าไม้</td><td class="tn">1,550</td><td class="tn">1,114</td><td class="tn">887</td><td class="tn"><span class="change-badge down">-17.50%</span></td><td class="tn"><span class="change-badge down">-11.42%</span></td></tr>
+      <tr><td>เบ็ดเตล็ด</td><td class="tn">680</td><td class="tn">1,198</td><td class="tn">2,063</td><td class="tn"><span class="change-badge up">+20.79%</span></td><td class="tn"><span class="change-badge up">+43.51%</span></td></tr>
+    </tbody>
+  </table></div>
+  <div class="card-b" style="font-size:11px;color:var(--color-text-secondary);line-height:1.65">
+    <b style="color:var(--color-text-primary);display:block;margin-bottom:4px">หมายเหตุ:</b>
+    ความถูกต้องของแผนที่จากการจำแนกเชิงวัตถุ (OBIA): ปี 2538 = 85.31% · ปี 2547 = 88.81% · ปี 2560 = 92.30%<br>
+    แหล่งข้อมูล: Landsat 5 (2538, 2547) และ Sentinel-2 (2560) | อ.ธาตุพนม จ.นครพนม
+  </div>
+</div>
+
+<!-- CALENDAR -->
+<div class="page" id="page-calendar">
+  <div style="display:flex;gap:8px;margin-bottom:10px;align-items:center">
+    <div class="sec" style="margin:0">ปฏิทินการเพาะปลูกพืชริมแม่น้ำโขง</div>
+    <select id="calMode"><option value="before">ก่อนโครงการพัฒนา (ยังชีพ)</option><option value="after">หลังโครงการพัฒนา (การค้า)</option></select>
+  </div>
+  <div class="card-b" style="margin-bottom:10px;font-size:11px;color:var(--color-text-secondary);line-height:1.6" id="calContext"></div>
+  <div class="legend-cal">
+    <span><span class="lbox" style="background:#2563EB"></span>ผักผลไม้ระยะยาว (พริก มะเขือ ฟักทอง)</span>
+    <span><span class="lbox" style="background:#16A34A"></span>ผักใบ/อายุสั้น (กะหล่ำ ผักกาด คะน้า)</span>
+    <span><span class="lbox" style="background:#D97706"></span>เครื่องเทศ/สมุนไพร (หอม กระเทียม ข่า)</span>
+    <span><span class="lbox" style="background:#9333EA"></span>ยาสูบ</span>
+    <span><span class="lbox" style="background:#0891B2"></span>ผักบุ้ง/กวางตุ้ง</span>
+    <span><span class="lbox" style="background:#64748B"></span>พักหน้าดิน</span>
+  </div>
+  <div class="cal-wrap"><div class="cal-grid" id="calGrid"></div></div>
+  <div class="divider"></div>
+  <div class="sec">เปรียบเทียบกับเกณฑ์ฝนรายเดือน</div>
+  <div class="cw" style="height:200px"><canvas id="calRainChart" aria-label="ปริมาณฝนรายเดือนกับช่วงเพาะปลูก"></canvas></div>
+  <div class="card-b" style="margin-top:8px;font-size:11px;color:var(--color-text-secondary);line-height:1.6" id="calNote"></div>
+</div>
+
+<!-- IMPACT -->
+<div class="page" id="page-impact">
+  <div class="sec">ความเชื่อมโยง: น้ำฝนสุดขีด → การใช้ที่ดิน → กระบวนการเกษตร</div>
+  <div class="impact-row">
+    <div class="impact-card" style="border-color:var(--color-border-danger)">
+      <div class="impact-icon">🌧️</div>
+      <div class="impact-title" style="color:var(--color-text-danger)">น้ำฝนสุดขีด (GEV)</div>
+      <div class="impact-text">Return Level 100 ปี ที่นครพนมสูงถึง 281.75 มม. กระแสน้ำผิดปกติกัดเซาะตลิ่งรุนแรง ทำให้พื้นที่เกษตรริมโขงลดลงต่อเนื่อง</div>
+    </div>
+    <div style="display:flex;align-items:center;justify-content:center;font-size:22px;color:var(--color-text-tertiary)">→</div>
+    <div class="impact-card" style="border-color:var(--color-border-warning)">
+      <div class="impact-icon">🗺️</div>
+      <div class="impact-title" style="color:var(--color-text-warning)">การเปลี่ยนแปลงที่ดิน</div>
+      <div class="impact-text">พื้นที่เกษตรลดลง 934 ไร่ (2538–2560) ป่าไม้ลดลง 663 ไร่ พนังกันตลิ่งแทนที่พื้นที่เกษตรริมโขง</div>
+    </div>
+    <div style="display:flex;align-items:center;justify-content:center;font-size:22px;color:var(--color-text-tertiary)">→</div>
+    <div class="impact-card" style="border-color:var(--color-border-info)">
+      <div class="impact-icon">🌱</div>
+      <div class="impact-title" style="color:var(--color-text-info)">ผลกระทบต่อเกษตร</div>
+      <div class="impact-text">จากยังชีพ → การค้า ใช้เทคโนโลยีสูง ปุ๋ยเคมีเพิ่ม เพาะปลูกเข้มข้นตลอดปี พื้นที่จำกัด</div>
+    </div>
+  </div>
+  <div class="divider"></div>
+  <div class="sec">เปรียบเทียบกระบวนการผลิต: ก่อน vs หลังโครงการพัฒนา</div>
+  <div class="row2" style="margin-bottom:12px">
+    <div class="card-b">
+      <div style="font-size:12px;font-weight:500;color:var(--color-text-success);margin-bottom:8px">ก่อนโครงการ (ยังชีพ)</div>
+      <div style="display:flex;flex-direction:column;gap:5px;font-size:11px;color:var(--color-text-secondary)">
+        <div>🌾 ผลิตเพื่อบริโภคในครัวเรือน เหลือจึงขาย</div>
+        <div>💰 ต้นทุนต่อหน่วยพื้นที่ต่ำ</div>
+        <div>👨‍👩‍👧 แรงงานในครอบครัว ไม่จ้างงาน</div>
+        <div>🌿 เก็บเมล็ดพันธุ์เอง ใช้ปุ๋ยธรรมชาติ</div>
+        <div>📅 เพาะปลูกตามฤดูกาล พักหน้าดิน เม.ย.–พ.ค.</div>
+        <div>🚫 ไม่ใช้สารเคมี</div>
+      </div>
+    </div>
+    <div class="card-b">
+      <div style="font-size:12px;font-weight:500;color:var(--color-text-danger);margin-bottom:8px">หลังโครงการ (การค้า)</div>
+      <div style="display:flex;flex-direction:column;gap:5px;font-size:11px;color:var(--color-text-secondary)">
+        <div>🛒 ผลิตเพื่อขาย ตอบสนองความต้องการตลาด</div>
+        <div>💸 ต้นทุนต่อหน่วยพื้นที่สูง</div>
+        <div>🚜 จ้างรถไถ จ้างแรงงานเก็บเกี่ยว</div>
+        <div>🧪 ซื้อเมล็ดพันธุ์ ใช้ปุ๋ยเคมี+สารกำจัดศัตรูพืช</div>
+        <div>📅 เพาะปลูกเข้มข้นตลอดปี ปลูกพืชหมุนเวียน</div>
+        <div>⚙️ ใช้เทคโนโลยีการเกษตรสูง</div>
+      </div>
+    </div>
+  </div>
+  <div class="sec">Return Level vs พื้นที่เกษตรที่เสี่ยง (นครพนม)</div>
+  <div class="cw" style="height:210px"><canvas id="impactChart" aria-label="ความสัมพันธ์ Return Level กับพื้นที่เกษตร"></canvas></div>
+</div>
+
+<!-- ALERT -->
+<div class="page" id="page-alert">
+  <div class="sec">กำหนดเกณฑ์เตือนภัย</div>
+  <div class="card-b" style="margin-bottom:10px">
+    <div style="display:flex;flex-direction:column;gap:8px">
+      <div style="display:flex;align-items:center;gap:8px">
+        <span class="rb r-l" style="width:64px;text-align:center">เฝ้าระวัง</span>
+        <span style="font-size:11px;flex:1">ฝนตกหนัก — แจ้งเกษตรกรเตรียมพร้อม</span>
+        <input type="number" id="t1" value="90" style="width:70px;font-size:11px;padding:4px 6px;border-radius:var(--border-radius-md);border:.5px solid var(--color-border-secondary);background:var(--color-background-primary);color:var(--color-text-primary)">
+        <span style="font-size:10px;color:var(--color-text-secondary)">มม.</span>
+      </div>
+      <div style="display:flex;align-items:center;gap:8px">
+        <span class="rb r-m" style="width:64px;text-align:center">เตือนภัย</span>
+        <span style="font-size:11px;flex:1">ฝนตกหนักมาก — หน่วยงานเตรียมรับมือ</span>
+        <input type="number" id="t2" value="130" style="width:70px;font-size:11px;padding:4px 6px;border-radius:var(--border-radius-md);border:.5px solid var(--color-border-secondary);background:var(--color-background-primary);color:var(--color-text-primary)">
+        <span style="font-size:10px;color:var(--color-text-secondary)">มม.</span>
+      </div>
+      <div style="display:flex;align-items:center;gap:8px">
+        <span class="rb r-h" style="width:64px;text-align:center">วิกฤต</span>
+        <span style="font-size:11px;flex:1">ฝนสุดขีด — แจ้งอพยพ ปิดระบบชลประทาน</span>
+        <input type="number" id="t3" value="180" style="width:70px;font-size:11px;padding:4px 6px;border-radius:var(--border-radius-md);border:.5px solid var(--color-border-secondary);background:var(--color-background-primary);color:var(--color-text-primary)">
+        <span style="font-size:10px;color:var(--color-text-secondary)">มม.</span>
+      </div>
+    </div>
+  </div>
+  <div class="sec">Return Level vs เกณฑ์เตือนภัย</div>
+  <div class="cw" style="height:240px;margin-bottom:10px"><canvas id="thrChart" aria-label="Return Level vs เกณฑ์"></canvas></div>
+  <div class="sec">จำลองสถานการณ์และบันทึกการแจ้งเตือน</div>
+  <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px;align-items:center">
+    <select id="simSt"><option value="0">สกลนคร สกษ.</option><option value="1">สกลนคร</option><option value="2">นครพนม</option><option value="3">นครพนม สกษ.</option><option value="4">บึงกาฬ</option><option value="5">มุกดาหาร</option></select>
+    <input type="number" id="simV" value="155" min="0" max="350" style="width:75px;font-size:11px;padding:4px 6px;border-radius:var(--border-radius-md);border:.5px solid var(--color-border-secondary);background:var(--color-background-primary);color:var(--color-text-primary)">
+    <span style="font-size:11px;color:var(--color-text-secondary)">มม./วัน</span>
+    <button onclick="runSim()" style="font-size:11px;padding:4px 10px;border-radius:var(--border-radius-md);border:.5px solid var(--color-border-secondary);background:transparent;color:var(--color-text-primary);cursor:pointer">▶ จำลอง</button>
+    <button onclick="clearLog()" style="font-size:11px;padding:4px 10px;border-radius:var(--border-radius-md);border:.5px solid var(--color-border-secondary);background:transparent;color:var(--color-text-secondary);cursor:pointer">✕ ล้าง</button>
+  </div>
+  <div id="alertLog" style="background:var(--color-background-secondary);border-radius:var(--border-radius-md);padding:10px 12px;font-size:11px;max-height:180px;overflow-y:auto">
+    <span style="color:var(--color-text-tertiary)">ยังไม่มีการแจ้งเตือน</span>
+  </div>
+</div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<script>
+const ST=[
+  {id:48355,name:'สกลนคร สกษ.',prov:'สกลนคร',lat:17.155,lng:104.098,mu:91.81,sigma:27.38,xi:-0.02,returns:[101.82,132.38,152.30,195.30,213.14],dist:'Weibull',risk:'mid'},
+  {id:48356,name:'สกลนคร',prov:'สกลนคร',lat:17.163,lng:104.148,mu:84.28,sigma:17.83,xi:0.12,returns:[90.96,113.56,130.30,172.83,193.49],dist:'Fréchet',risk:'low'},
+  {id:48357,name:'นครพนม',prov:'นครพนม',lat:17.400,lng:104.773,mu:109.86,sigma:36.77,xi:-0.01,returns:[123.31,164.54,191.54,250.15,274.59],dist:'Weibull',risk:'high'},
+  {id:48358,name:'นครพนม สกษ.',prov:'นครพนม',lat:17.385,lng:104.755,mu:122.94,sigma:40.11,xi:-0.07,returns:[137.46,180.18,206.73,260.68,281.75],dist:'Weibull',risk:'high'},
+  {id:48363,name:'บึงกาฬ',prov:'บึงกาฬ',lat:18.360,lng:103.650,mu:92.25,sigma:31.35,xi:-0.01,returns:[103.72,139.00,162.20,212.80,234.00],dist:'Weibull',risk:'mid'},
+  {id:48383,name:'มุกดาหาร',prov:'มุกดาหาร',lat:16.543,lng:104.724,mu:91.31,sigma:25.27,xi:-0.02,returns:[100.55,128.74,147.12,186.75,203.17],dist:'Weibull',risk:'mid'},
+];
+const COLORS=['#185FA5','#0F6E56','#D85A30','#993556','#BA7517','#639922'];
+const PER=['2 ปี','5 ปี','10 ปี','50 ปี','100 ปี'];
+let mapObj=null,ovCh=null,luCh=null,calCh=null,impCh=null,thrCh=null;
+let logs=[];
+
+function rb(r){return r==='high'?'<span class="rb r-h">สูง</span>':r==='mid'?'<span class="rb r-m">ปาน</span>':'<span class="rb r-l">ต่ำ</span>';}
+
+function go(p){
+  document.querySelectorAll('.page').forEach(x=>x.classList.remove('active'));
+  document.querySelectorAll('.tab').forEach(x=>x.classList.remove('active'));
+  document.getElementById('page-'+p).classList.add('active');
+  const idx={overview:0,map:1,landuse:2,calendar:3,impact:4,alert:5};
+  document.querySelectorAll('.tab')[idx[p]].classList.add('active');
+  if(p==='map')setTimeout(initMap,80);
+  if(p==='calendar')setTimeout(renderCal,80);
+  if(p==='impact')setTimeout(renderImpact,80);
+  if(p==='alert')setTimeout(renderThr,80);
+}
+
+/* OVERVIEW */
+const leg=document.getElementById('ovLeg');
+leg.innerHTML=ST.map((s,i)=>`<span style="display:flex;align-items:center;gap:4px"><span style="width:9px;height:9px;border-radius:2px;background:${COLORS[i]};display:inline-block"></span>${s.name}</span>`).join('');
+function buildOv(){
+  const t=document.getElementById('ovType').value;
+  if(ovCh)ovCh.destroy();
+  ovCh=new Chart(document.getElementById('ovChart'),{
+    type:t==='bar'?'bar':'line',
+    data:{labels:PER,datasets:ST.map((s,i)=>({label:s.name,data:s.returns.map(v=>+v.toFixed(2)),backgroundColor:COLORS[i]+'BB',borderColor:COLORS[i],borderWidth:1.5,tension:0.35,pointRadius:3}))},
+    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>` ${c.dataset.label}: ${c.parsed.y.toFixed(2)} มม.`}}},scales:{y:{ticks:{font:{size:10},callback:v=>v.toFixed(0)},title:{display:true,text:'ปริมาณฝน (มม.)',font:{size:10},color:'#888'}},x:{ticks:{font:{size:10}}}}}
+  });
+}
+document.getElementById('ovType').addEventListener('change',buildOv);
+const tb=document.getElementById('ovTbl');
+ST.forEach(s=>{const tr=document.createElement('tr');tr.innerHTML=`<td><b>${s.name}</b></td><td>${s.prov}</td>${s.returns.map(v=>`<td class="tn">${v.toFixed(2)}</td>`).join('')}<td>${s.dist}</td><td>${rb(s.risk)}</td>`;tb.appendChild(tr);});
+buildOv();
+
+/* MAP */
+function initMap(){
+  if(mapObj)return;
+  mapObj=L.map('map').setView([17.5,104.3],7);
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{attribution:'© OpenStreetMap',maxZoom:18}).addTo(mapObj);
+  ST.forEach((s)=>{
+    const c=s.risk==='high'?'#E24B4A':s.risk==='mid'?'#EF9F27':'#639922';
+    L.circleMarker([s.lat,s.lng],{radius:10,fillColor:c,color:'#fff',weight:2,opacity:1,fillOpacity:.9}).addTo(mapObj)
+      .bindPopup(`<b>${s.name}</b> (${s.id})<br>จังหวัด: ${s.prov}<br>Return Level 100 ปี: <b>${s.returns[4].toFixed(2)} มม.</b><br>การแจกแจง: ${s.dist}`);
+  });
+  // ธาตุพนม marker
+  L.marker([17.387,104.718]).addTo(mapObj)
+    .bindPopup('<b>อ.ธาตุพนม</b><br>พื้นที่ศึกษา Land Use Change<br>2538–2560 (OBIA)');
+}
+
+/* LAND USE */
+const luTypes=[
+  {name:'แหล่งน้ำ',color:'#2563EB',y38:10169,y47:10656,y60:10013},
+  {name:'เกษตรกรรม',color:'#16A34A',y38:6092,y47:5252,y60:5158},
+  {name:'อยู่อาศัย',color:'#DC2626',y38:1992,y47:2233,y60:2362},
+  {name:'ป่าไม้',color:'#0891B2',y38:1550,y47:1114,y60:887},
+  {name:'เบ็ดเตล็ด',color:'#9333EA',y38:680,y47:1198,y60:2063},
+];
+const total=20483;
+const luCards=document.getElementById('luCards');
+luTypes.forEach(lu=>{
+  const pct38=(lu.y38/total*100),pct47=(lu.y47/total*100),pct60=(lu.y60/total*100);
+  const diff=lu.y60-lu.y38;
+  luCards.innerHTML+=`<div class="lu-card">
+    <div class="lu-name">${lu.name} ${diff>=0?`<span class="change-badge up">+${((diff/lu.y38)*100).toFixed(1)}%</span>`:`<span class="change-badge down">${((diff/lu.y38)*100).toFixed(1)}%</span>`}</div>
+    <div class="lu-bar-wrap"><div class="lu-year">2538</div><div class="lu-bar-bg"><div class="lu-bar-fill" style="width:${pct38.toFixed(1)}%;background:${lu.color}"></div></div><div class="lu-pct">${lu.y38.toLocaleString()}</div></div>
+    <div class="lu-bar-wrap"><div class="lu-year">2547</div><div class="lu-bar-bg"><div class="lu-bar-fill" style="width:${pct47.toFixed(1)}%;background:${lu.color}80"></div></div><div class="lu-pct">${lu.y47.toLocaleString()}</div></div>
+    <div class="lu-bar-wrap"><div class="lu-year">2560</div><div class="lu-bar-bg"><div class="lu-bar-fill" style="width:${pct60.toFixed(1)}%;background:${lu.color}50"></div></div><div class="lu-pct">${lu.y60.toLocaleString()}</div></div>
+  </div>`;
+});
+if(luCh)luCh.destroy();
+setTimeout(()=>{
+  luCh=new Chart(document.getElementById('luChart'),{
+    type:'bar',
+    data:{labels:luTypes.map(l=>l.name),datasets:[
+      {label:'2538',data:luTypes.map(l=>l.y38),backgroundColor:luTypes.map(l=>l.color+'CC'),borderColor:luTypes.map(l=>l.color),borderWidth:1},
+      {label:'2547',data:luTypes.map(l=>l.y47),backgroundColor:luTypes.map(l=>l.color+'77'),borderColor:luTypes.map(l=>l.color),borderWidth:1,borderDash:[3,2]},
+      {label:'2560',data:luTypes.map(l=>l.y60),backgroundColor:luTypes.map(l=>l.color+'33'),borderColor:luTypes.map(l=>l.color),borderWidth:1},
+    ]},
+    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{labels:{font:{size:10}}}},scales:{y:{ticks:{font:{size:10},callback:v=>v.toLocaleString()},title:{display:true,text:'พื้นที่ (ไร่)',font:{size:10},color:'#888'}},x:{ticks:{font:{size:10}}}}}
+  });
+},100);
+
+/* CALENDAR */
+const MONTHS=['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];
+const CROPS_BEFORE=[
+  {name:'พริก/มะเขือ/ฟักทอง',color:'#2563EB',months:[0,0,0,0,0,0,0,1,1,1,1,1]},// ส.ค.-ธ.ค.
+  {name:'กะหล่ำ/ผักกาด/คะน้า',color:'#16A34A',months:[1,1,1,0,0,0,0,0,0,0,0,0]},// ม.ค.-มี.ค.
+  {name:'ข่า/ตะไคร้/มะละกอ',color:'#D97706',months:[0,0,0,1,1,0,0,0,0,0,0,0]},// เม.ย.-พ.ค.
+  {name:'พักหน้าดิน',color:'#64748B',months:[0,0,0,1,1,0,0,0,0,0,0,0]},
+];
+const CROPS_AFTER=[
+  {name:'ผักบุ้ง/กวางตุ้ง',color:'#0891B2',months:[0,0,0,0,0,0,1,0,0,0,0,0]},// ก.ค.
+  {name:'พริก/มะเขือ/ฟักทอง/หอมแบ่ง',color:'#2563EB',months:[0,0,0,0,0,0,0,1,1,1,1,1]},
+  {name:'หอมแดง/กระเทียม/กะหล่ำ/ผักกาด',color:'#16A34A',months:[1,1,1,1,0,0,0,0,0,0,0,0]},
+  {name:'ข่า/ตะไคร้/มะเขือเปราะ/มะละกอ',color:'#D97706',months:[0,0,0,0,1,1,0,0,0,0,0,0]},
+  {name:'ยาสูบ',color:'#9333EA',months:[0,0,0,0,1,1,1,0,0,0,0,0]},
+];
+const RAIN_MONTHLY=[18,22,50,85,175,210,240,265,285,220,80,30];
+
+const calCtx={
+  before:'<b>ก่อนโครงการพัฒนา (พ.ศ. ก่อน 2539):</b> เกษตรกรรมแบบยังชีพ เพาะปลูกตามฤดูกาล พักหน้าดิน เม.ย.–พ.ค. ใช้เมล็ดพันธุ์ท้องถิ่น ปุ๋ยธรรมชาติ แรงงานในครอบครัว',
+  after:'<b>หลังโครงการพัฒนา (พ.ศ. 2547–ปัจจุบัน):</b> เกษตรกรรมเชิงพาณิชย์ เพาะปลูกตลอดปีโดยไม่พักหน้าดิน ปลูกพืชหมุนเวียน ซื้อเมล็ดพันธุ์ ใช้ปุ๋ยเคมีและสารเคมี จ้างรถไถ+แรงงาน',
+};
+const calNote={
+  before:'ช่วงน้ำลดริมโขง (ส.ค.–ธ.ค.) = จุดเริ่มฤดูเพาะปลูก | ช่วงฝนหนัก (ก.ค.–ก.ย.) ปริมาณฝน >200 มม./เดือน เกษตรกรไม่เพาะปลูกในพื้นที่เสี่ยง',
+  after:'เกษตรกรเริ่มปลูกเร็วขึ้น (ก.ค.) เพราะพื้นที่มีจำกัด ต้องใช้ประโยชน์ตลอดปี | ความเสี่ยงจากฝนสุดขีดเพิ่มขึ้นเพราะปลูกในช่วงที่ปริมาณฝนยังสูง',
+};
+
+function renderCal(){
+  const mode=document.getElementById('calMode').value;
+  const crops=mode==='before'?CROPS_BEFORE:CROPS_AFTER;
+  document.getElementById('calContext').innerHTML=calCtx[mode];
+  document.getElementById('calNote').innerHTML=calNote[mode];
+  const grid=document.getElementById('calGrid');
+  grid.innerHTML='';
+  // header row
+  grid.innerHTML+='<div class="cal-hdr" style="text-align:left;padding-left:4px">พืช</div>'+MONTHS.map(m=>`<div class="cal-hdr">${m}</div>`).join('');
+  crops.forEach(cr=>{
+    grid.innerHTML+=`<div class="cal-label"><span class="cal-dot" style="background:${cr.color}"></span>${cr.name}</div>`;
+    cr.months.forEach(on=>{
+      grid.innerHTML+=`<div class="cal-cell ${on?'on':''}" style="background:${cr.color}"></div>`;
+    });
+  });
+  if(calCh)calCh.destroy();
+  calCh=new Chart(document.getElementById('calRainChart'),{
+    type:'bar',
+    data:{
+      labels:MONTHS,
+      datasets:[
+        {label:'ปริมาณฝน (มม.)',data:RAIN_MONTHLY,backgroundColor:'#185FA555',borderColor:'#185FA5',borderWidth:1,type:'line',tension:0.4,yAxisID:'y'},
+        {label:'เกณฑ์เฝ้าระวัง 90 มม.',data:Array(12).fill(90),borderColor:'#639922',borderDash:[4,3],borderWidth:1,type:'line',pointRadius:0,yAxisID:'y'},
+        {label:'เกณฑ์เตือนภัย 130 มม.',data:Array(12).fill(130),borderColor:'#EF9F27',borderDash:[4,3],borderWidth:1,type:'line',pointRadius:0,yAxisID:'y'},
+      ]
+    },
+    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{labels:{font:{size:10}}}},scales:{y:{ticks:{font:{size:10}},title:{display:true,text:'มม./เดือน',font:{size:10},color:'#888'}}}}
+  });
+}
+document.getElementById('calMode').addEventListener('change',renderCal);
+
+/* IMPACT */
+function renderImpact(){
+  if(impCh)impCh.destroy();
+  impCh=new Chart(document.getElementById('impactChart'),{
+    type:'bar',
+    data:{
+      labels:PER,
+      datasets:[
+        {label:'Return Level นครพนม สกษ.',data:[137.46,180.18,206.73,260.68,281.75],backgroundColor:'#E24B4A88',borderColor:'#E24B4A',borderWidth:1.5},
+        {label:'เกณฑ์เตือนภัย 130 มม.',data:Array(5).fill(130),type:'line',borderColor:'#EF9F27',borderDash:[4,3],borderWidth:1.5,pointRadius:0},
+        {label:'เกณฑ์วิกฤต 180 มม.',data:Array(5).fill(180),type:'line',borderColor:'#E24B4A',borderDash:[4,3],borderWidth:1.5,pointRadius:0},
+      ]
+    },
+    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{labels:{font:{size:10}}}},scales:{y:{ticks:{font:{size:10}},title:{display:true,text:'ปริมาณฝน (มม.)',font:{size:10},color:'#888'}},x:{ticks:{font:{size:10}}}}}
+  });
+}
+
+/* ALERT */
+function renderThr(){
+  const t1=+document.getElementById('t1').value||90;
+  const t2=+document.getElementById('t2').value||130;
+  const t3=+document.getElementById('t3').value||180;
+  if(thrCh)thrCh.destroy();
+  thrCh=new Chart(document.getElementById('thrChart'),{
+    type:'bar',
+    data:{labels:ST.map(s=>s.name),datasets:[
+      {label:'10 ปี',data:ST.map(s=>+s.returns[2].toFixed(2)),backgroundColor:'#185FA5AA',borderColor:'#185FA5',borderWidth:1},
+      {label:'50 ปี',data:ST.map(s=>+s.returns[3].toFixed(2)),backgroundColor:'#BA7517AA',borderColor:'#BA7517',borderWidth:1},
+      {label:'100 ปี',data:ST.map(s=>+s.returns[4].toFixed(2)),backgroundColor:'#E24B4AAA',borderColor:'#E24B4A',borderWidth:1},
+    ]},
+    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{labels:{font:{size:10}}},annotation:{annotations:{
+      l1:{type:'line',yMin:t1,yMax:t1,borderColor:'#639922',borderWidth:1.5,borderDash:[4,3]},
+      l2:{type:'line',yMin:t2,yMax:t2,borderColor:'#EF9F27',borderWidth:1.5,borderDash:[4,3]},
+      l3:{type:'line',yMin:t3,yMax:t3,borderColor:'#E24B4A',borderWidth:1.5,borderDash:[4,3]},
+    }}},scales:{y:{ticks:{font:{size:10},callback:v=>v.toFixed(0)},title:{display:true,text:'มม.',font:{size:10},color:'#888'}},x:{ticks:{font:{size:10},autoSkip:false,maxRotation:30}}}}
+  });
+}
+['t1','t2','t3'].forEach(id=>document.getElementById(id).addEventListener('change',renderThr));
+
+function runSim(){
+  const si=+document.getElementById('simSt').value;
+  const v=+document.getElementById('simV').value;
+  const t1=+document.getElementById('t1').value||90;
+  const t2=+document.getElementById('t2').value||130;
+  const t3=+document.getElementById('t3').value||180;
+  const s=ST[si];
+  let lv='ปกติ',cls='r-l',msg='';
+  if(v>=t3){lv='วิกฤต';cls='r-h';msg=`${s.name} ฝน ${v} มม. — เกินวิกฤต (${t3} มม.) แจ้งหน่วยงานอพยพ+ปิดชลประทาน`;}
+  else if(v>=t2){lv='เตือนภัย';cls='r-m';msg=`${s.name} ฝน ${v} มม. — เกินเตือน (${t2} มม.) เตรียมรับมือน้ำท่วม`;}
+  else if(v>=t1){lv='เฝ้าระวัง';cls='r-l';msg=`${s.name} ฝน ${v} มม. — ถึงเกณฑ์เฝ้าระวัง (${t1} มม.) แจ้งเกษตรกร`;}
+  else{msg=`${s.name} ฝน ${v} มม. — ปกติ`;}
+  const near=s.returns.findIndex(r=>r>v);
+  const nTxt=near===-1?'เกิน Return Level 100 ปี':near===0?'ต่ำกว่า 2 ปี':`ระหว่าง ${[2,5,10,50,100][near-1]}–${[2,5,10,50,100][near]} ปี`;
+  const t=new Date().toLocaleTimeString('th-TH');
+  logs.unshift({lv,cls,msg,nTxt,t});
+  if(logs.length>10)logs.pop();
+  document.getElementById('alertLog').innerHTML=logs.map(l=>
+    `<div style="display:flex;gap:6px;align-items:flex-start;padding:4px 0;border-bottom:.5px solid var(--color-border-tertiary)">
+      <span class="rb ${l.cls}" style="flex-shrink:0">${l.lv}</span>
+      <div style="flex:1"><div>${l.msg}</div><div style="font-size:10px;color:var(--color-text-secondary);margin-top:1px">${l.nTxt}</div></div>
+      <span style="font-size:10px;color:var(--color-text-tertiary);white-space:nowrap">${l.t}</span>
+    </div>`
+  ).join('');
+}
+function clearLog(){logs=[];document.getElementById('alertLog').innerHTML='<span style="color:var(--color-text-tertiary)">ยังไม่มีการแจ้งเตือน</span>';}
+</script>

@@ -1,11 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { 
-  LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine, AreaChart, Area
+  LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine, AreaChart, Area, BarChart, Bar, Legend
 } from 'recharts';
 import { 
   CloudRain, Map as MapIcon, Database, Leaf, Bell, Download, Info, 
   Calendar, MapPin, Activity, AlertTriangle, CheckCircle, Home, Loader2, ChevronRight, DownloadCloud, FileText,
-  Navigation, Menu, X
+  Navigation, Menu, X, Layers, TrendingUp, BarChart2
 } from 'lucide-react';
 import L from 'leaflet';
 
@@ -66,21 +66,38 @@ export default function App() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isLocating, setIsLocating] = useState(false);
 
+  const [calMode, setCalMode] = useState("after");
+  const [ovType, setOvType] = useState("bar");
+  const [t1, setT1] = useState(90);
+  const [t2, setT2] = useState(130);
+  const [t3, setT3] = useState(180);
+  const [simStation, setSimStation] = useState("48358");
+  const [simValue, setSimValue] = useState(155);
+  const [simLogs, setSimLogs] = useState([]);
+
   const menuItems = [
-    { id: 'home', label: 'หน้าหลัก', icon: Home },
-    { id: 'stations', label: 'ข้อมูลสถานีและตาราง GEV', icon: Database },
+    { id: 'home', label: 'หน้าหลัก (รายสถานี)', icon: Home },
+    { id: 'overview', label: 'เปรียบเทียบสถิติ 6 สถานี', icon: BarChart2 },
+    { id: 'stations', label: 'ตาราง GEV รายสถานี', icon: Database },
     { id: 'map', label: 'แผนที่ความเสี่ยง', icon: MapIcon },
+    { id: 'landuse', label: 'การใช้ที่ดินริมโขง', icon: Layers },
+    { id: 'calendar', label: 'ปฏิทินเพาะปลูก', icon: Calendar },
     { id: 'advisory', label: 'คำแนะนำการเกษตร', icon: Leaf },
-    { id: 'alerts', label: 'การแจ้งเตือน', icon: Bell },
+    { id: 'impact', label: 'ผลกระทบเชิงระบบ', icon: TrendingUp },
+    { id: 'alerts', label: 'เกณฑ์และการแจ้งเตือน', icon: Bell },
     { id: 'download', label: 'ดาวน์โหลดรายงาน', icon: Download },
   ];
 
   const pageTitles = {
-    home: 'สรุปภาพรวมความเสี่ยง',
-    stations: 'ข้อมูลสถานีและตารางสถิติ',
-    map: 'แผนที่ความเสี่ยงอุทกวิทยา',
-    advisory: 'คำแนะนำการเพาะปลูก',
-    alerts: 'การแจ้งเตือนอุทกภัย',
+    home: 'สรุปภาพรวมความเสี่ยงรายสถานี',
+    overview: 'เปรียบเทียบสถิติน้ำฝนสุดขีด 6 สถานี',
+    stations: 'ตารางสถิติและแบบจำลอง GEV',
+    map: 'แผนที่ความเสี่ยงอุทกวิทยา (IDW)',
+    landuse: 'สถิติการเปลี่ยนแปลงการใช้ที่ดิน อ.ธาตุพนม',
+    calendar: 'ปฏิทินการเพาะปลูกพืชริมแม่น้ำโขง',
+    advisory: 'คู่มือและคำแนะนำการเพาะปลูกพืช',
+    impact: 'ความเชื่อมโยง: น้ำฝนสุดขีดและการใช้ที่ดิน',
+    alerts: 'ระบบตั้งเกณฑ์ภัยพิบัติและจำลองแจ้งเตือน',
     download: 'ส่งออกรายงานข้อมูล (CSV)',
   };
 
@@ -814,42 +831,769 @@ export default function App() {
     changePage('home');
   };
 
-  const renderAlerts = () => (
-    <div className="space-y-4 animate-in slide-in-from-bottom duration-500">
-        <h3 className="text-xl font-bold text-slate-800">ประวัติการแจ้งเตือนทั้งหมด</h3>
-        <p className="text-sm text-slate-500">คลิกที่การแจ้งเตือนเพื่อดูกราฟ GEV และข้อมูลสถิติของสถานีนั้น</p>
-        <div className="space-y-3">
+  const handleRunSimulation = () => {
+    const s = stations.find(x => x.id === simStation) || stations[0];
+    const val = Number(simValue);
+    
+    // Determine risk level based on current set thresholds t1, t2, t3
+    let lv = "ปกติ";
+    let cls = "bg-green-50 text-green-600 border border-green-200";
+    let badgeCls = "bg-green-500 text-white";
+    let msg = `${s.name} ฝน ${val} มม. — ปกติ`;
+
+    if (val >= t3) {
+      lv = "วิกฤต";
+      cls = "bg-red-50 text-red-600 border border-red-200";
+      badgeCls = "bg-red-500 text-white";
+      msg = `${s.name} ฝน ${val} มม. — เกินวิกฤต (${t3} มม.) แจ้งหน่วยงานอพยพ+ปิดชลประทาน`;
+    } else if (val >= t2) {
+      lv = "เตือนภัย";
+      cls = "bg-yellow-50 text-yellow-600 border border-yellow-200";
+      badgeCls = "bg-yellow-500 text-white";
+      msg = `${s.name} ฝน ${val} มม. — เกินเตือน (${t2} มม.) เตรียมรับมือน้ำท่วม`;
+    } else if (val >= t1) {
+      lv = "เฝ้าระวัง";
+      cls = "bg-orange-50 text-orange-600 border border-orange-200";
+      badgeCls = "bg-orange-500 text-white";
+      msg = `${s.name} ฝน ${val} มม. — ถึงเกณฑ์เฝ้าระวัง (${t1} มม.) แจ้งเกษตรกร`;
+    }
+
+    const t = new Date().toLocaleTimeString('th-TH');
+    const newLog = { lv, cls, badgeCls, msg, t, id: Date.now() };
+    setSimLogs(prev => [newLog, ...prev.slice(0, 9)]);
+  };
+
+  const handleClearLogs = () => {
+    setSimLogs([]);
+  };
+
+  const renderOverviewComparison = () => {
+    const chartData = [
+      { name: '2 ปี', 'สกลนคร สกษ.': 101.82, 'สกลนคร': 90.96, 'นครพนม': 123.31, 'นครพนม สกษ.': 137.46, 'บึงกาฬ': 103.72, 'มุกดาหาร': 100.55 },
+      { name: '5 ปี', 'สกลนคร สกษ.': 132.38, 'สกลนคร': 113.56, 'นครพนม': 164.54, 'นครพนม สกษ.': 180.18, 'บึงกาฬ': 139.00, 'มุกดาหาร': 128.74 },
+      { name: '10 ปี', 'สกลนคร สกษ.': 152.30, 'สกลนคร': 130.30, 'นครพนม': 191.54, 'นครพนม สกษ.': 206.73, 'บึงกาฬ': 162.20, 'มุกดาหาร': 147.12 },
+      { name: '50 ปี', 'สกลนคร สกษ.': 195.30, 'สกลนคร': 172.83, 'นครพนม': 250.15, 'นครพนม สกษ.': 260.68, 'บึงกาฬ': 212.80, 'มุกดาหาร': 186.75 },
+      { name: '100 ปี', 'สกลนคร สกษ.': 213.14, 'สกลนคร': 193.49, 'นครพนม': 274.59, 'นครพนม สกษ.': 281.75, 'บึงกาฬ': 234.00, 'มุกดาหาร': 203.17 },
+    ];
+    const stationsKeys = ['สกลนคร สกษ.', 'สกลนคร', 'นครพนม', 'นครพนม สกษ.', 'บึงกาฬ', 'มุกดาหาร'];
+    const colors = ['#185FA5','#0F6E56','#D85A30','#993556','#BA7517','#639922'];
+    const tableData = [
+      { name: 'สกลนคร สกษ.', prov: 'สกลนคร', r2: 101.82, r5: 132.38, r10: 152.30, r50: 195.30, r100: 213.14, dist: 'Weibull', risk: 'mid' },
+      { name: 'สกลนคร', prov: 'สกลนคร', r2: 90.96, r5: 113.56, r10: 130.30, r50: 172.83, r100: 193.49, dist: 'Fréchet', risk: 'low' },
+      { name: 'นครพนม', prov: 'นครพนม', r2: 123.31, r5: 164.54, r10: 191.54, r50: 250.15, r100: 274.59, dist: 'Weibull', risk: 'high' },
+      { name: 'นครพนม สกษ.', prov: 'นครพนม', r2: 137.46, r5: 180.18, r10: 206.73, r50: 260.68, r100: 281.75, dist: 'Weibull', risk: 'high' },
+      { name: 'บึงกาฬ', prov: 'บึงกาฬ', r2: 103.72, r5: 139.00, r10: 162.20, r50: 212.80, r100: 234.00, dist: 'Weibull', risk: 'mid' },
+      { name: 'มุกดาหาร', prov: 'มุกดาหาร', r2: 100.55, r5: 128.74, r10: 147.12, r50: 186.75, r100: 203.17, dist: 'Weibull', risk: 'mid' }
+    ];
+
+    const getRiskBadge = (risk) => {
+      if (risk === 'high') return <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-red-100 text-red-600 border border-red-200">สูง</span>;
+      if (risk === 'mid') return <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-yellow-100 text-yellow-600 border border-yellow-200">ปานกลาง</span>;
+      return <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-green-100 text-green-600 border border-green-200">ต่ำ</span>;
+    };
+
+    return (
+      <div className="space-y-6 animate-in fade-in duration-500">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm">
+            <p className="text-slate-500 text-xs mb-1">Return Level 100 ปี (สูงสุด)</p>
+            <h3 className="text-2xl font-bold text-slate-800">281.75 <span className="text-sm font-normal text-slate-500">มม.</span></h3>
+            <p className="text-[10px] text-slate-400 mt-1">นครพนม สกษ. (48358)</p>
+          </div>
+          <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm">
+            <p className="text-slate-500 text-xs mb-1">ฝนสูงสุดบันทึกได้</p>
+            <h3 className="text-2xl font-bold text-slate-800">304.40 <span className="text-sm font-normal text-slate-500">มม.</span></h3>
+            <p className="text-[10px] text-slate-400 mt-1">สถานีวัดฝนนครพนม (48357)</p>
+          </div>
+          <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm">
+            <p className="text-slate-500 text-xs mb-1">พื้นที่เกษตรลดลง (2538–2560)</p>
+            <h3 className="text-2xl font-bold text-red-600">-934 <span className="text-sm font-normal text-slate-500">ไร่</span></h3>
+            <p className="text-[10px] text-slate-400 mt-1">จาก 6,092 ไร่ → 5,158 ไร่ (อ.ธาตุพนม)</p>
+          </div>
+          <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm">
+            <p className="text-slate-500 text-xs mb-1">กลุ่มตัวอย่างเกษตรกร</p>
+            <h3 className="text-2xl font-bold text-indigo-600">60 <span className="text-sm font-normal text-slate-500">ราย</span></h3>
+            <p className="text-[10px] text-slate-400 mt-1">สัมภาษณ์เชิงลึก อ.ธาตุพนม จ.นครพนม</p>
+          </div>
+        </div>
+
+        <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
+          <div className="flex justify-between items-center mb-4 flex-wrap gap-2">
+            <h4 className="font-bold text-slate-800 flex items-center gap-2">
+              <Activity className="w-5 h-5 text-blue-500" />
+              เปรียบเทียบ Return Level 6 สถานี
+            </h4>
+            <div className="flex gap-2 items-center">
+              <span className="text-xs text-slate-500">รูปแบบกราฟ:</span>
+              <select
+                value={ovType}
+                onChange={(e) => setOvType(e.target.value)}
+                className="bg-slate-50 border border-slate-200 rounded-lg px-2 py-1 text-xs text-slate-700"
+              >
+                <option value="bar">กราฟแท่ง (Bar Chart)</option>
+                <option value="line">กราฟเส้น (Line Chart)</option>
+              </select>
+            </div>
+          </div>
+          
+          <div className="h-80 w-full">
+            <ResponsiveContainer width="100%" height="100%">
+              {ovType === 'bar' ? (
+                <BarChart data={chartData} margin={{ top: 10, right: 10, left: -10, bottom: 5 }}>
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                  <XAxis dataKey="name" stroke="#94a3b8" fontSize={11} />
+                  <YAxis stroke="#94a3b8" fontSize={11} />
+                  <Tooltip formatter={(value) => [`${value} มม.`, '']} />
+                  <Legend wrapperStyle={{ fontSize: 10 }} />
+                  {stationsKeys.map((k, i) => (
+                    <Bar key={k} dataKey={k} fill={colors[i]} radius={[4, 4, 0, 0]} />
+                  ))}
+                </BarChart>
+              ) : (
+                <LineChart data={chartData} margin={{ top: 10, right: 10, left: -10, bottom: 5 }}>
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                  <XAxis dataKey="name" stroke="#94a3b8" fontSize={11} />
+                  <YAxis stroke="#94a3b8" fontSize={11} />
+                  <Tooltip formatter={(value) => [`${value} มม.`, '']} />
+                  <Legend wrapperStyle={{ fontSize: 10 }} />
+                  {stationsKeys.map((k, i) => (
+                    <Line key={k} type="monotone" dataKey={k} stroke={colors[i]} strokeWidth={2} activeDot={{ r: 5 }} />
+                  ))}
+                </LineChart>
+              )}
+            </ResponsiveContainer>
+          </div>
+        </div>
+
+        <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
+          <h4 className="font-bold text-slate-800 mb-4 text-sm">ตารางค่าระดับการเกิดซ้ำ (Return Level Table) - เปรียบเทียบทุกสถานี</h4>
+          <div className="overflow-x-auto">
+            <table className="w-full text-xs text-left border-collapse">
+              <thead>
+                <tr className="bg-slate-50 border-b border-slate-200">
+                  <th className="py-2.5 px-3 font-semibold text-slate-600">สถานี</th>
+                  <th className="py-2.5 px-3 font-semibold text-slate-600">จังหวัด</th>
+                  <th className="py-2.5 px-3 font-semibold text-slate-600 text-right">2 ปี</th>
+                  <th className="py-2.5 px-3 font-semibold text-slate-600 text-right">5 ปี</th>
+                  <th className="py-2.5 px-3 font-semibold text-slate-600 text-right">10 ปี</th>
+                  <th className="py-2.5 px-3 font-semibold text-slate-600 text-right">50 ปี</th>
+                  <th className="py-2.5 px-3 font-semibold text-slate-600 text-right">100 ปี</th>
+                  <th className="py-2.5 px-3 font-semibold text-slate-600">การแจกแจง GEV</th>
+                  <th className="py-2.5 px-3 font-semibold text-slate-600 text-center">ระดับความเสี่ยง</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {tableData.map((row, idx) => (
+                  <tr key={idx} className="hover:bg-slate-50">
+                    <td className="py-2.5 px-3 font-medium text-slate-800">{row.name}</td>
+                    <td className="py-2.5 px-3 text-slate-500">{row.prov}</td>
+                    <td className="py-2.5 px-3 text-right font-mono text-slate-700">{row.r2.toFixed(2)}</td>
+                    <td className="py-2.5 px-3 text-right font-mono text-slate-700">{row.r5.toFixed(2)}</td>
+                    <td className="py-2.5 px-3 text-right font-mono text-slate-700">{row.r10.toFixed(2)}</td>
+                    <td className="py-2.5 px-3 text-right font-mono text-slate-700">{row.r50.toFixed(2)}</td>
+                    <td className="py-2.5 px-3 text-right font-mono font-bold text-blue-600">{row.r100.toFixed(2)}</td>
+                    <td className="py-2.5 px-3 text-slate-500 font-mono">{row.dist}</td>
+                    <td className="py-2.5 px-3 text-center">{getRiskBadge(row.risk)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  const renderLandUse = () => {
+    const luTypes = [
+      { name: 'แหล่งน้ำ', color: 'bg-blue-600', fill: '#2563EB', y38: 10169, y47: 10656, y60: 10013, diff: -1.5 },
+      { name: 'เกษตรกรรม', color: 'bg-green-600', fill: '#16A34A', y38: 6092, y47: 5252, y60: 5158, diff: -15.3 },
+      { name: 'อยู่อาศัย', color: 'bg-red-600', fill: '#DC2626', y38: 1992, y47: 2233, y60: 2362, diff: 18.6 },
+      { name: 'ป่าไม้', color: 'bg-cyan-600', fill: '#0891B2', y38: 1550, y47: 1114, y60: 887, diff: -42.8 },
+      { name: 'เบ็ดเตล็ด', color: 'bg-purple-600', fill: '#9333EA', y38: 680, y47: 1198, y60: 2063, diff: 203.4 }
+    ];
+    const totalArea = 20483;
+
+    const chartData = luTypes.map(l => ({
+      name: l.name,
+      'พ.ศ. 2538': l.y38,
+      'พ.ศ. 2547': l.y47,
+      'พ.ศ. 2560': l.y60
+    }));
+
+    return (
+      <div className="space-y-6 animate-in fade-in duration-500">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+          {luTypes.map((lu) => {
+            const diffPct = ((lu.y60 - lu.y38) / lu.y38 * 100).toFixed(1);
+            const isUp = lu.y60 >= lu.y38;
+            return (
+              <div key={lu.name} className="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm flex flex-col justify-between">
+                <div>
+                  <div className="flex justify-between items-center mb-2">
+                    <span className="text-slate-700 font-bold text-xs">{lu.name}</span>
+                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded ${isUp ? 'bg-green-50 text-green-600 border border-green-100' : 'bg-red-50 text-red-600 border border-red-100'}`}>
+                      {isUp ? '+' : ''}{diffPct}%
+                    </span>
+                  </div>
+                  
+                  <div className="space-y-2 mt-3">
+                    <div>
+                      <div className="flex justify-between text-[10px] text-slate-400 mb-0.5">
+                        <span>พ.ศ. 2538</span>
+                        <span>{lu.y38.toLocaleString()} ไร่</span>
+                      </div>
+                      <div className="w-full bg-slate-100 rounded-full h-1">
+                        <div className={`h-1 rounded-full ${lu.color}`} style={{ width: `${(lu.y38 / totalArea * 100) * 2}%` }}></div>
+                      </div>
+                    </div>
+                    <div>
+                      <div className="flex justify-between text-[10px] text-slate-400 mb-0.5">
+                        <span>พ.ศ. 2547</span>
+                        <span>{lu.y47.toLocaleString()} ไร่</span>
+                      </div>
+                      <div className="w-full bg-slate-100 rounded-full h-1">
+                        <div className={`h-1 rounded-full ${lu.color} opacity-70`} style={{ width: `${(lu.y47 / totalArea * 100) * 2}%` }}></div>
+                      </div>
+                    </div>
+                    <div>
+                      <div className="flex justify-between text-[10px] text-slate-400 mb-0.5">
+                        <span>พ.ศ. 2560</span>
+                        <span>{lu.y60.toLocaleString()} ไร่</span>
+                      </div>
+                      <div className="w-full bg-slate-100 rounded-full h-1">
+                        <div className={`h-1 rounded-full ${lu.color} opacity-40`} style={{ width: `${(lu.y60 / totalArea * 100) * 2}%` }}></div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <div className="lg:col-span-2 bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
+            <h4 className="font-bold text-slate-800 mb-4 text-sm">กราฟเปรียบเทียบขนาดพื้นที่แยกตามการใช้ประโยชน์ (ไร่)</h4>
+            <div className="h-80 w-full">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={chartData} margin={{ top: 10, right: 10, left: -10, bottom: 5 }}>
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                  <XAxis dataKey="name" stroke="#94a3b8" fontSize={11} />
+                  <YAxis stroke="#94a3b8" fontSize={11} />
+                  <Tooltip formatter={(value) => [`${value.toLocaleString()} ไร่`, '']} />
+                  <Legend wrapperStyle={{ fontSize: 10 }} />
+                  <Bar dataKey="พ.ศ. 2538" fill="#4f46e5" radius={[4, 4, 0, 0]} />
+                  <Bar dataKey="พ.ศ. 2547" fill="#6366f1" opacity={0.7} radius={[4, 4, 0, 0]} />
+                  <Bar dataKey="พ.ศ. 2560" fill="#818cf8" opacity={0.4} radius={[4, 4, 0, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+
+          <div className="lg:col-span-1 bg-white p-6 rounded-2xl border border-slate-200 shadow-sm flex flex-col justify-between">
+            <div>
+              <h4 className="font-bold text-slate-800 mb-3 text-sm flex items-center gap-2">
+                <Info className="w-5 h-5 text-indigo-500" /> คำอธิบายและระเบียบวิธี
+              </h4>
+              <p className="text-xs text-slate-500 leading-relaxed font-normal">
+                การวิเคราะห์การเปลี่ยนแปลงการใช้ที่ดินครอบคลุมพื้นที่ริมแม่น้ำโขง <b>อำเภอธาตุพนม จังหวัดนครพนม</b> พื้นที่รวมประมาณ 345.66 ตร.กม. (ครอบคลุม 7 ตำบลที่ตั้งแปลงเกษตรริมโขง)
+              </p>
+              <div className="my-4 space-y-3 bg-slate-50 p-4 rounded-xl border border-slate-100 text-xs">
+                <div>
+                  <span className="font-bold text-slate-700 block">เทคโนโลยีที่ใช้:</span>
+                  <span className="text-slate-500">ดาวเทียม Landsat 5 (ปี 2538, 2547) และ Sentinel-2 (ปี 2560)</span>
+                </div>
+                <div>
+                  <span className="font-bold text-slate-700 block">การประมวลผลรูปภาพ:</span>
+                  <span className="text-slate-500">จำแนกตามพิกัดโครงสร้างวัตถุ (OBIA) โดยมีความถูกต้องสูง</span>
+                </div>
+                <div>
+                  <span className="font-bold text-slate-700 block">เกณฑ์ความถูกต้องเฉลี่ย (Overall Accuracy):</span>
+                  <ul className="list-disc list-inside text-slate-500 mt-1 pl-1 space-y-0.5">
+                    <li>พ.ศ. 2538: 85.31%</li>
+                    <li>พ.ศ. 2547: 88.81%</li>
+                    <li>พ.ศ. 2560: 92.30%</li>
+                  </ul>
+                </div>
+              </div>
+            </div>
+            <div className="bg-blue-50 border border-blue-200 rounded-xl p-3.5 text-xs text-blue-800">
+              💡 <b>ข้อมูลวิจัย:</b> พื้นที่เกษตรริมฝั่งโขงลดลงอย่างมีนัยสำคัญกว่า 934 ไร่ เนื่องจากการเปลี่ยนแปลงขอบเขตตลิ่งและโครงสร้างพนังกันน้ำ
+            </div>
+          </div>
+        </div>
+
+        <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
+          <h4 className="font-bold text-slate-800 mb-4 text-sm">ตารางสถิติและการเปลี่ยนแปลงสัดส่วนการใช้ที่ดิน (%)</h4>
+          <div className="overflow-x-auto">
+            <table className="w-full text-xs text-left border-collapse">
+              <thead>
+                <tr className="bg-slate-50 border-b border-slate-200">
+                  <th className="py-2.5 px-3 font-semibold text-slate-600">ประเภทที่ดิน</th>
+                  <th className="py-2.5 px-3 font-semibold text-slate-600 text-right">2538 (ไร่)</th>
+                  <th className="py-2.5 px-3 font-semibold text-slate-600 text-right">2547 (ไร่)</th>
+                  <th className="py-2.5 px-3 font-semibold text-slate-600 text-right">2560 (ไร่)</th>
+                  <th className="py-2.5 px-3 font-semibold text-slate-600 text-center">สัดส่วนปี 38</th>
+                  <th className="py-2.5 px-3 font-semibold text-slate-600 text-center">สัดส่วนปี 60</th>
+                  <th className="py-2.5 px-3 font-semibold text-slate-600 text-center">เปลี่ยน 38-47</th>
+                  <th className="py-2.5 px-3 font-semibold text-slate-600 text-center">เปลี่ยน 47-60</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {luTypes.map((row, idx) => (
+                  <tr key={idx} className="hover:bg-slate-50">
+                    <td className="py-2.5 px-3 font-medium text-slate-800">{row.name}</td>
+                    <td className="py-2.5 px-3 text-right font-mono text-slate-700">{row.y38.toLocaleString()}</td>
+                    <td className="py-2.5 px-3 text-right font-mono text-slate-700">{row.y47.toLocaleString()}</td>
+                    <td className="py-2.5 px-3 text-right font-mono text-slate-700">{row.y60.toLocaleString()}</td>
+                    <td className="py-2.5 px-3 text-center text-slate-500 font-mono">{(row.y38/totalArea*100).toFixed(2)}%</td>
+                    <td className="py-2.5 px-3 text-center text-slate-500 font-mono">{(row.y60/totalArea*100).toFixed(2)}%</td>
+                    <td className="py-2.5 px-3 text-center">
+                      <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${row.name === 'เกษตรกรรม' || row.name === 'ป่าไม้' ? 'bg-red-50 text-red-600 border border-red-100' : 'bg-green-50 text-green-600 border border-green-100'}`}>
+                        {row.name === 'แหล่งน้ำ' ? '+19.54%' : row.name === 'เกษตรกรรม' ? '-32.50%' : row.name === 'อยู่อาศัย' ? '+9.67%' : row.name === 'ป่าไม้' ? '-17.50%' : '+20.79%'}
+                      </span>
+                    </td>
+                    <td className="py-2.5 px-3 text-center">
+                      <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${row.name === 'แหล่งน้ำ' || row.name === 'เกษตรกรรม' || row.name === 'ป่าไม้' ? 'bg-red-50 text-red-600 border border-red-100' : 'bg-green-50 text-green-600 border border-green-100'}`}>
+                        {row.name === 'แหล่งน้ำ' ? '-32.34%' : row.name === 'เกษตรกรรม' ? '-6.24%' : row.name === 'อยู่อาศัย' ? '+6.45%' : row.name === 'ป่าไม้' ? '-11.42%' : '+43.51%'}
+                      </span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  const renderCropCalendar = () => {
+    const MONTHS = ['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];
+    const CROPS_BEFORE = [
+      { name: 'พริก/มะเขือ/ฟักทอง', color: 'bg-blue-600', fill: '#2563EB', months: [0,0,0,0,0,0,0,1,1,1,1,1] },
+      { name: 'กะหล่ำ/ผักกาด/คะน้า', color: 'bg-green-600', fill: '#16A34A', months: [1,1,1,0,0,0,0,0,0,0,0,0] },
+      { name: 'ข่า/ตะไคร้/มะละกอ', color: 'bg-amber-600', fill: '#D97706', months: [0,0,0,1,1,0,0,0,0,0,0,0] },
+      { name: 'พักหน้าดิน', color: 'bg-slate-500', fill: '#64748B', months: [0,0,0,1,1,0,0,0,0,0,0,0] }
+    ];
+    const CROPS_AFTER = [
+      { name: 'ผักบุ้ง/กวางตุ้ง', color: 'bg-cyan-600', fill: '#0891B2', months: [0,0,0,0,0,0,1,0,0,0,0,0] },
+      { name: 'พริก/มะเขือ/ฟักทอง/หอมแบ่ง', color: 'bg-blue-600', fill: '#2563EB', months: [0,0,0,0,0,0,0,1,1,1,1,1] },
+      { name: 'หอมแดง/กระเทียม/กะหล่ำ/ผักกาด', color: 'bg-green-600', fill: '#16A34A', months: [1,1,1,1,0,0,0,0,0,0,0,0] },
+      { name: 'ข่า/ตะไคร้/มะเขือเปราะ/มะละกอ', color: 'bg-amber-600', fill: '#D97706', months: [0,0,0,0,1,1,0,0,0,0,0,0] },
+      { name: 'ยาสูบ', color: 'bg-purple-600', fill: '#9333EA', months: [0,0,0,0,1,1,1,0,0,0,0,0] }
+    ];
+
+    const RAIN_MONTHLY = [
+      { name: 'ม.ค.', 'ปริมาณฝน (มม.)': 18, 'เกณฑ์เฝ้าระวัง': 90, 'เกณฑ์เตือนภัย': 130 },
+      { name: 'ก.พ.', 'ปริมาณฝน (มม.)': 22, 'เกณฑ์เฝ้าระวัง': 90, 'เกณฑ์เตือนภัย': 130 },
+      { name: 'มี.ค.', 'ปริมาณฝน (มม.)': 50, 'เกณฑ์เฝ้าระวัง': 90, 'เกณฑ์เตือนภัย': 130 },
+      { name: 'เม.ย.', 'ปริมาณฝน (มม.)': 85, 'เกณฑ์เฝ้าระวัง': 90, 'เกณฑ์เตือนภัย': 130 },
+      { name: 'พ.ค.', 'ปริมาณฝน (มม.)': 175, 'เกณฑ์เฝ้าระวัง': 90, 'เกณฑ์เตือนภัย': 130 },
+      { name: 'มิ.ย.', 'ปริมาณฝน (มม.)': 210, 'เกณฑ์เฝ้าระวัง': 90, 'เกณฑ์เตือนภัย': 130 },
+      { name: 'ก.ค.', 'ปริมาณฝน (มม.)': 240, 'เกณฑ์เฝ้าระวัง': 90, 'เกณฑ์เตือนภัย': 130 },
+      { name: 'ส.ค.', 'ปริมาณฝน (มม.)': 265, 'เกณฑ์เฝ้าระวัง': 90, 'เกณฑ์เตือนภัย': 130 },
+      { name: 'ก.ย.', 'ปริมาณฝน (มม.)': 285, 'เกณฑ์เฝ้าระวัง': 90, 'เกณฑ์เตือนภัย': 130 },
+      { name: 'ต.ค.', 'ปริมาณฝน (มม.)': 220, 'เกณฑ์เฝ้าระวัง': 90, 'เกณฑ์เตือนภัย': 130 },
+      { name: 'พ.ย.', 'ปริมาณฝน (มม.)': 80, 'เกณฑ์เฝ้าระวัง': 90, 'เกณฑ์เตือนภัย': 130 },
+      { name: 'ธ.ค.', 'ปริมาณฝน (มม.)': 30, 'เกณฑ์เฝ้าระวัง': 90, 'เกณฑ์เตือนภัย': 130 }
+    ];
+
+    const currentCrops = calMode === 'before' ? CROPS_BEFORE : CROPS_AFTER;
+
+    const calCtx = {
+      before: 'ก่อนโครงการพัฒนา (พ.ศ. ก่อน 2539): เกษตรกรรมแบบยังชีพ เพาะปลูกตามฤดูกาล พักหน้าดิน เม.ย.–พ.ค. ใช้เมล็ดพันธุ์ท้องถิ่น ปุ๋ยธรรมชาติ แรงงานในครอบครัว',
+      after: 'หลังโครงการพัฒนา (พ.ศ. 2547–ปัจจุบัน): เกษตรกรรมเชิงพาณิชย์ เพาะปลูกตลอดปีโดยไม่พักหน้าดิน ปลูกพืชหมุนเวียน ซื้อเมล็ดพันธุ์ ใช้ปุ๋ยเคมีและสารเคมี จ้างรถไถ+แรงงาน'
+    };
+
+    const calNote = {
+      before: 'ช่วงน้ำลดริมโขง (ส.ค.–ธ.ค.) = จุดเริ่มฤดูเพาะปลูก | ช่วงฝนหนัก (ก.ค.–ก.ย.) ปริมาณฝน >200 มม./เดือน เกษตรกรไม่เพาะปลูกในพื้นที่เสี่ยง',
+      after: 'เกษตรกรเริ่มปลูกเร็วขึ้น (ก.ค.) เพราะพื้นที่มีจำกัด ต้องใช้ประโยชน์ตลอดปี | ความเสี่ยงจากฝนสุดขีดเพิ่มขึ้นเพราะปลูกในช่วงที่ปริมาณฝนยังสูง'
+    };
+
+    return (
+      <div className="space-y-6 animate-in fade-in duration-500">
+        <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
+          <div className="flex justify-between items-center mb-4 flex-wrap gap-2">
+            <h4 className="font-bold text-slate-800 text-sm">ปฏิทินเพาะปลูกพืชริมฝั่งแม่น้ำโขง (Crop Calendar)</h4>
+            <select
+              value={calMode}
+              onChange={(e) => setCalMode(e.target.value)}
+              className="bg-slate-50 border border-slate-200 rounded-lg px-3 py-1.5 text-xs font-bold text-slate-700 focus:outline-none cursor-pointer"
+            >
+              <option value="before">ก่อนโครงการพัฒนา (เพื่อการยังชีพ)</option>
+              <option value="after">หลังโครงการพัฒนา (เพื่อการค้า)</option>
+            </select>
+          </div>
+          
+          <div className="bg-slate-50 p-4 rounded-xl border border-slate-100 text-xs text-slate-600 leading-relaxed font-normal mb-5">
+            <b>ลักษณะกระบวนการผลิต:</b> {calCtx[calMode]}
+          </div>
+
+          <div className="flex flex-wrap gap-4 text-[10px] text-slate-500 mb-4">
+            <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded bg-blue-600"></span>ผักผลไม้ระยะยาว (พริก มะเขือ ฟักทอง)</span>
+            <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded bg-green-600"></span>ผักใบ/อายุสั้น (กะหล่ำ ผักกาด คะน้า)</span>
+            <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded bg-amber-600"></span>เครื่องเทศ/สมุนไพร (หอม กระเทียม ข่า)</span>
+            <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded bg-purple-600"></span>ยาสูบ</span>
+            <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded bg-cyan-600"></span>ผักบุ้ง/กวางตุ้ง</span>
+            <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded bg-slate-500"></span>พักหน้าดิน</span>
+          </div>
+
+          <div className="overflow-x-auto">
+            <div className="select-none text-center" style={{ display: 'grid', gridTemplateColumns: '160px repeat(12, minmax(0, 1fr))', gap: '6px', minWidth: '650px' }}>
+              {/* Header row */}
+              <div className="font-semibold text-slate-500 text-xs text-left self-center py-1">ประเภทพืช</div>
+              {MONTHS.map(m => (
+                <div key={m} className="font-semibold text-slate-500 text-[10px] self-center py-1 bg-slate-100 rounded">{m}</div>
+              ))}
+              
+              {/* Crop rows */}
+              {currentCrops.map((crop, idx) => (
+                <React.Fragment key={idx}>
+                  <div className="text-left text-xs font-semibold text-slate-700 flex items-center gap-1 py-2">
+                    <span className={`w-2 h-2 rounded-full ${crop.color}`}></span>
+                    {crop.name}
+                  </div>
+                  {crop.months.map((on, mIdx) => (
+                    <div
+                      key={mIdx}
+                      className={`h-7 rounded transition-all duration-150 self-center ${on ? `${crop.color} shadow-sm border border-black/5` : 'bg-slate-50 opacity-20'}`}
+                      title={`${crop.name} - ${MONTHS[mIdx]}`}
+                    ></div>
+                  ))}
+                </React.Fragment>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <div className="lg:col-span-2 bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
+            <h4 className="font-bold text-slate-800 mb-4 text-sm">ความสัมพันธ์ปริมาณฝนรายเดือน (มม.) กับขีดความปลอดภัย</h4>
+            <div className="h-64 w-full">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={RAIN_MONTHLY} margin={{ top: 10, right: 10, left: -15, bottom: 5 }}>
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                  <XAxis dataKey="name" stroke="#94a3b8" fontSize={11} />
+                  <YAxis stroke="#94a3b8" fontSize={11} />
+                  <Tooltip formatter={(value) => [`${value} มม.`, '']} />
+                  <Legend wrapperStyle={{ fontSize: 10 }} />
+                  <Bar dataKey="ปริมาณฝน (มม.)" fill="#185FA5" radius={[4, 4, 0, 0]} opacity={0.6} />
+                  <ReferenceLine y={90} stroke="#639922" strokeDasharray="4 3" label={{ value: 'เกณฑ์เฝ้าระวัง 90 มม.', position: 'insideTopLeft', fill: '#639922', fontSize: 9 }} />
+                  <ReferenceLine y={130} stroke="#EF9F27" strokeDasharray="4 3" label={{ value: 'เกณฑ์เตือนภัย 130 มม.', position: 'insideTopLeft', fill: '#EF9F27', fontSize: 9 }} />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+
+          <div className="lg:col-span-1 bg-white p-6 rounded-2xl border border-slate-200 shadow-sm flex flex-col justify-between">
+            <div>
+              <h4 className="font-bold text-slate-800 mb-3 text-sm flex items-center gap-2">
+                <Info className="w-5 h-5 text-indigo-500" /> นัยสำคัญด้านอุทกภัย
+              </h4>
+              <p className="text-xs text-slate-600 leading-relaxed font-normal">
+                {calNote[calMode]}
+              </p>
+              <div className="my-4 bg-slate-50 p-4 rounded-xl border border-slate-100 text-xs space-y-2 text-slate-500 font-normal">
+                <p>⚠️ <b>ขีดจำกัดความเสี่ยง:</b> ปริมาณฝนตกเกิน 130 มม./เดือน ในช่วงกรกฎาคมถึงกันยายนมีความชุกสูงมาก ทำให้เกิดโอกาสน้ำหลากตลิ่งท่วมแปลงเพาะปลูกฉับพลัน</p>
+                <p>🌱 <b>คำแนะนำ:</b> สำหรับการปลูกพืชการค้าในปัจจุบัน ควรเพิ่มระบบประกันภัยและบ่อพักเก็บน้ำในส่วนที่เป็นขอบตะกอนดินริมโขง</p>
+              </div>
+            </div>
+            <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-3.5 text-xs text-emerald-800">
+              📌 <b>พิกัดเป้าหมาย:</b> ข้อมูลสำรวจจากพื้นที่ตลิ่งเกษตรกรรม 7 ตำบลริมโขง อ.ธาตุพนม นครพนม
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  const renderImpactLinkage = () => {
+    const chartData = [
+      { name: '2 ปี', 'Return Level': 137.46, 'เกณฑ์เตือนภัย': 130, 'เกณฑ์วิกฤต': 180 },
+      { name: '5 ปี', 'Return Level': 180.18, 'เกณฑ์เตือนภัย': 130, 'เกณฑ์วิกฤต': 180 },
+      { name: '10 ปี', 'Return Level': 206.73, 'เกณฑ์เตือนภัย': 130, 'เกณฑ์วิกฤต': 180 },
+      { name: '50 ปี', 'Return Level': 260.68, 'เกณฑ์เตือนภัย': 130, 'เกณฑ์วิกฤต': 180 },
+      { name: '100 ปี', 'Return Level': 281.75, 'เกณฑ์เตือนภัย': 130, 'เกณฑ์วิกฤต': 180 }
+    ];
+
+    return (
+      <div className="space-y-6 animate-in fade-in duration-500">
+        <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
+          <h4 className="font-bold text-slate-800 mb-6 text-sm">ความเชื่อมโยงเชิงระบบ (Hydrometeorological & Socio-Economic Linkages)</h4>
+          
+          <div className="grid grid-cols-1 md:grid-cols-5 gap-4 items-center">
+            <div className="bg-red-50 border border-red-200 rounded-xl p-4 text-center">
+              <span className="text-3xl block mb-2">🌧️</span>
+              <h5 className="font-bold text-red-700 text-xs mb-1">ฝนสุดขีด (GEV)</h5>
+              <p className="text-[10px] text-red-600 font-normal leading-relaxed">
+                นครพนม สกษ. 100 ปี = 281.75 มม. กระแสน้ำโขงกัดเซาะตลิ่งพังเสียหายรุนแรง
+              </p>
+            </div>
+            
+            <div className="text-center font-bold text-slate-400 hidden md:block text-lg">➔</div>
+            
+            <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 text-center">
+              <span className="text-3xl block mb-2">🗺️</span>
+              <h5 className="font-bold text-amber-700 text-xs mb-1">การเปลี่ยนแปลงที่ดิน</h5>
+              <p className="text-[10px] text-amber-600 font-normal leading-relaxed">
+                พื้นที่เกษตรลดลง 934 ไร่ ป่าไม้ลดลง 663 ไร่ พนังกันตลิ่งปูนคอนกรีตแทนที่แปลงดินริมโขง
+              </p>
+            </div>
+            
+            <div className="text-center font-bold text-slate-400 hidden md:block text-lg">➔</div>
+            
+            <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 text-center">
+              <span className="text-3xl block mb-2">🌱</span>
+              <h5 className="font-bold text-blue-700 text-xs mb-1">ผลกระทบต่อเกษตร</h5>
+              <p className="text-[10px] text-blue-600 font-normal leading-relaxed">
+                จากเกษตรยังชีพเปลี่ยนเป็นพาณิชย์ ใช้ต้นทุนปุ๋ยเคมีและเครื่องจักรสูง ปลูกอัดแน่นตลอดปีในพื้นที่จำกัด
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
+            <h5 className="font-bold text-emerald-600 text-sm mb-4">ก่อนโครงการพัฒนา (แบบยังชีพ)</h5>
+            <div className="space-y-3 text-xs text-slate-600 font-normal leading-relaxed">
+              <p>🌾 <b>ผลผลิต:</b> เน้นปลูกเพื่อบริโภคในครัวเรือน เหลือจากบริโภคจึงนำไปแลกเปลี่ยนหรือขาย</p>
+              <p>💰 <b>ต้นทุน:</b> ต้นทุนต่ำ ไม่เน้นใช้สารเคมี ใช้ปุ๋ยธรรมชาติจากมูลสัตว์และเศษใบไม้</p>
+              <p>👨‍👩‍👧 <b>แรงงาน:</b> พึ่งพาแรงงานในครอบครัวเป็นหลัก ไม่มีระบบจ้างงานข้ามกลุ่ม</p>
+              <p>🌿 <b>เมล็ดพันธุ์:</b> เก็บเมล็ดพันธุ์เองจากรอบปีที่แล้วเพื่อสืบพันธุ์พืชดั้งเดิม</p>
+              <p>📅 <b>ฤดูกาล:</b> ปลูกตามน้ำขึ้นน้ำลง พักหน้าดินอย่างชัดเจนในช่วงเมษายน–พฤษภาคม</p>
+            </div>
+          </div>
+
+          <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
+            <h5 className="font-bold text-red-600 text-sm mb-4">หลังโครงการพัฒนา (แบบพาณิชย์)</h5>
+            <div className="space-y-3 text-xs text-slate-600 font-normal leading-relaxed">
+              <p>🛒 <b>ผลผลิต:</b> ปลูกเพื่อป้อนตลาดเชิงพาณิชย์ขนาดใหญ่ ตอบสนองปริมาณรับซื้อของพ่อค้าคนกลาง</p>
+              <p>💸 <b>ต้นทุน:</b> ต้นทุนการผลิตต่อไร่สูงมากจากการซื้อยาฆ่าแมลง ปุ๋ยเคมี และสารกำจัดศัตรูพืช</p>
+              <p>🚜 <b>แรงงาน:</b> พึ่งพาเครื่องจักรกล จ้างรถไถดิน จ้างแรงงานนอกพื้นที่ในการเก็บเกี่ยว</p>
+              <p>🧪 <b>เมล็ดพันธุ์:</b> ต้องซื้อเมล็ดพันธุ์ลูกผสมเชิงพาณิชย์ทุกรอบปีเพื่อคุณภาพผลผลิตที่เท่ากัน</p>
+              <p>📅 <b>ฤดูกาล:</b> ปลูกหมุนเวียนต่อเนื่องกันตลอดปีโดยไม่พักดิน เนื่องจากต้องการทำกำไรสูงสุด</p>
+            </div>
+          </div>
+        </div>
+
+        <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
+          <h4 className="font-bold text-slate-800 mb-4 text-sm">Return Level นครพนม สกษ. เทียบกับขีดความเสียหายพืชริมตลิ่ง</h4>
+          <div className="h-64 w-full">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={chartData} margin={{ top: 10, right: 10, left: -15, bottom: 5 }}>
+                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                <XAxis dataKey="name" stroke="#94a3b8" fontSize={11} />
+                <YAxis stroke="#94a3b8" fontSize={11} />
+                <Tooltip formatter={(value) => [`${value} มม.`, '']} />
+                <Legend wrapperStyle={{ fontSize: 10 }} />
+                <Bar dataKey="Return Level" fill="#ef4444" radius={[4, 4, 0, 0]} opacity={0.7} />
+                <ReferenceLine y={130} stroke="#EF9F27" strokeDasharray="4 3" label={{ value: 'เกณฑ์เตือนภัย 130 มม.', position: 'insideTopLeft', fill: '#EF9F27', fontSize: 9 }} />
+                <ReferenceLine y={180} stroke="#dc2626" strokeDasharray="4 3" label={{ value: 'เกณฑ์วิกฤต 180 มม.', position: 'insideTopLeft', fill: '#dc2626', fontSize: 9 }} />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  const renderAlerts = () => {
+    const stationsReturnData = [
+      { name: 'สกลนคร สกษ.', '10 ปี': 152.30, '50 ปี': 195.30, '100 ปี': 213.14 },
+      { name: 'สกลนคร', '10 ปี': 130.30, '50 ปี': 172.83, '100 ปี': 193.49 },
+      { name: 'นครพนม', '10 ปี': 191.54, '50 ปี': 250.15, '100 ปี': 274.59 },
+      { name: 'นครพนม สกษ.', '10 ปี': 206.73, '50 ปี': 260.68, '100 ปี': 281.75 },
+      { name: 'บึงกาฬ', '10 ปี': 162.20, '50 ปี': 212.80, '100 ปี': 234.00 },
+      { name: 'มุกดาหาร', '10 ปี': 147.12, '50 ปี': 186.75, '100 ปี': 203.17 }
+    ];
+
+    return (
+      <div className="space-y-6 animate-in slide-in-from-bottom duration-500">
+        <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
+          <h4 className="font-bold text-slate-800 mb-4 text-sm flex items-center gap-2">
+             <Bell className="w-5 h-5 text-blue-500" /> กำหนดเกณฑ์แจ้งเตือนภัย (Threshold Setup)
+          </h4>
+          
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="bg-green-50 border border-green-200 rounded-xl p-4 flex flex-col justify-between">
+              <div>
+                <span className="text-xs font-bold text-green-700 block mb-1">🚨 ระดับที่ 1: เฝ้าระวัง (Watch)</span>
+                <span className="text-[10px] text-green-600 leading-normal block font-normal">ฝนเริ่มตกหนักสะสม — ส่งสัญญาณแจ้งเตือนล่วงหน้าให้เกษตรกรเตรียมจัดยกของขึ้นสูง</span>
+              </div>
+              <div className="flex items-center gap-2 mt-4">
+                <input
+                  type="number"
+                  value={t1}
+                  onChange={(e) => setT1(Number(e.target.value))}
+                  className="bg-white border border-green-200 rounded-lg px-2.5 py-1.5 text-xs font-bold text-slate-800 focus:outline-none w-24"
+                />
+                <span className="text-[10px] text-green-600 font-bold">มม./วัน</span>
+              </div>
+            </div>
+
+            <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-4 flex flex-col justify-between">
+              <div>
+                <span className="text-xs font-bold text-yellow-700 block mb-1">🚨 ระดับที่ 2: เตือนภัย (Warning)</span>
+                <span className="text-[10px] text-yellow-600 leading-normal block font-normal">ฝนหนักต่อเนื่อง — เสี่ยงท่วมเฉียบพลันในพื้นที่ลุ่มต่ำ ประสบปัญหาไหลบ่าตลิ่ง</span>
+              </div>
+              <div className="flex items-center gap-2 mt-4">
+                <input
+                  type="number"
+                  value={t2}
+                  onChange={(e) => setT2(Number(e.target.value))}
+                  className="bg-white border border-yellow-200 rounded-lg px-2.5 py-1.5 text-xs font-bold text-slate-800 focus:outline-none w-24"
+                />
+                <span className="text-[10px] text-yellow-600 font-bold">มม./วัน</span>
+              </div>
+            </div>
+
+            <div className="bg-red-50 border border-red-200 rounded-xl p-4 flex flex-col justify-between">
+              <div>
+                <span className="text-xs font-bold text-red-700 block mb-1">🚨 ระดับที่ 3: วิกฤต (Critical)</span>
+                <span className="text-[10px] text-red-600 leading-normal block font-normal">ฝนระดับน้ำท่วมประวัติการณ์ — ดำเนินการอพยพ เร่งระบายน้ำ ปิดระบบควบคุมชลประทาน</span>
+              </div>
+              <div className="flex items-center gap-2 mt-4">
+                <input
+                  type="number"
+                  value={t3}
+                  onChange={(e) => setT3(Number(e.target.value))}
+                  className="bg-white border border-red-200 rounded-lg px-2.5 py-1.5 text-xs font-bold text-slate-800 focus:outline-none w-24"
+                />
+                <span className="text-[10px] text-red-600 font-bold">มม./วัน</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
+          <h4 className="font-bold text-slate-800 mb-4 text-sm">กราฟระดับการเกิดซ้ำ (Return Level) เทียบกับเกณฑ์ปรับแต่งส่วนบุคคล</h4>
+          <div className="h-72 w-full">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={stationsReturnData} margin={{ top: 10, right: 10, left: -15, bottom: 5 }}>
+                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                <XAxis dataKey="name" stroke="#94a3b8" fontSize={11} />
+                <YAxis stroke="#94a3b8" fontSize={11} />
+                <Tooltip formatter={(value) => [`${value} มม.`, '']} />
+                <Legend wrapperStyle={{ fontSize: 10 }} />
+                <Bar dataKey="10 ปี" fill="#1e3a8a" radius={[3, 3, 0, 0]} opacity={0.6} />
+                <Bar dataKey="50 ปี" fill="#1d4ed8" radius={[3, 3, 0, 0]} opacity={0.8} />
+                <Bar dataKey="100 ปี" fill="#3b82f6" radius={[3, 3, 0, 0]} />
+                <ReferenceLine y={t1} stroke="#22c55e" strokeDasharray="4 3" label={{ value: `เฝ้าระวัง ${t1} มม.`, position: 'insideTopLeft', fill: '#22c55e', fontSize: 9 }} />
+                <ReferenceLine y={t2} stroke="#eab308" strokeDasharray="4 3" label={{ value: `เตือนภัย ${t2} มม.`, position: 'insideTopLeft', fill: '#eab308', fontSize: 9 }} />
+                <ReferenceLine y={t3} stroke="#ef4444" strokeDasharray="4 3" label={{ value: `วิกฤต ${t3} มม.`, position: 'insideTopLeft', fill: '#ef4444', fontSize: 9 }} />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <div className="lg:col-span-1 bg-white p-6 rounded-2xl border border-slate-200 shadow-sm flex flex-col justify-between">
+            <div>
+              <h4 className="font-bold text-slate-800 mb-4 text-sm">เครื่องมือจำลองฝนตกสุดขีด (Rainfall Simulator)</h4>
+              
+              <div className="space-y-4">
+                <div>
+                  <label className="text-xs font-bold text-slate-500 block mb-1">เลือกสถานีเป้าหมาย:</label>
+                  <select
+                    value={simStation}
+                    onChange={(e) => setSimStation(e.target.value)}
+                    className="w-full bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-2 text-xs font-bold text-slate-700"
+                  >
+                    {stations.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="text-xs font-bold text-slate-500 block mb-1">ปริมาณฝนสะสมรายวัน:</label>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="number"
+                      value={simValue}
+                      onChange={(e) => setSimValue(Number(e.target.value))}
+                      className="bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-xs font-bold text-slate-800 focus:outline-none flex-1"
+                    />
+                    <span className="text-xs text-slate-400 font-bold">มม./วัน</span>
+                  </div>
+                </div>
+
+                <div className="flex gap-2 pt-2">
+                  <button
+                    onClick={handleRunSimulation}
+                    className="flex-1 py-2 bg-blue-600 text-white rounded-xl text-xs font-bold hover:bg-blue-700 transition-colors shadow-sm"
+                  >
+                    ▶ รันการจำลอง
+                  </button>
+                  <button
+                    onClick={handleClearLogs}
+                    className="py-2 px-4 bg-slate-100 text-slate-500 rounded-xl text-xs font-bold hover:bg-slate-200 transition-colors border border-slate-200"
+                  >
+                    ล้างประวัติ
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="lg:col-span-2 bg-white p-6 rounded-2xl border border-slate-200 shadow-sm flex flex-col">
+            <h4 className="font-bold text-slate-800 mb-3 text-sm">บันทึกเหตุการณ์การจำลอง (Simulation Logs)</h4>
+            <div className="flex-1 overflow-y-auto max-h-56 pr-2 space-y-2 text-xs font-normal">
+              {simLogs.length === 0 ? (
+                <div className="text-slate-400 text-center py-10 font-normal">ยังไม่มีการรันข้อมูลจำลอง</div>
+              ) : (
+                simLogs.map((log) => (
+                  <div key={log.id} className="p-3 bg-slate-50 border border-slate-100 rounded-xl flex items-start gap-3 justify-between">
+                    <div className="flex items-start gap-2.5">
+                      <span className={`px-2 py-0.5 rounded text-[9px] font-black uppercase ${log.cls}`}>
+                        {log.lv}
+                      </span>
+                      <span className="text-slate-700">{log.msg}</span>
+                    </div>
+                    <span className="text-[10px] text-slate-400 font-mono flex-shrink-0 self-center">{log.t}</span>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* Existing Alerts Section */}
+        <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
+          <h4 className="font-bold text-slate-800 mb-4 text-sm">ประวัติการแจ้งเตือนจริงจากระบบ (Historical Alerts)</h4>
+          <div className="space-y-3">
             {!alerts || alerts.length === 0 ? (
-              <div className="bg-white p-8 rounded-2xl border border-slate-200 text-center">
-                <Bell className="w-10 h-10 text-slate-200 mx-auto mb-3" />
-                <p className="text-slate-400 font-medium">ไม่มีประวัติการแจ้งเตือน</p>
-                <p className="text-slate-300 text-xs mt-1">ระบบจะแจ้งเตือนเมื่อพบความเสี่ยงสูงในสถานีใด</p>
+              <div className="bg-slate-50 p-6 rounded-xl border border-slate-100 text-center">
+                <Bell className="w-8 h-8 text-slate-300 mx-auto mb-2" />
+                <p className="text-slate-400 text-xs font-medium">ไม่มีการแจ้งเตือนจริงในฐานข้อมูล</p>
               </div>
             ) : (
               alerts.map(alert => (
-                  <div
-                    key={alert.id}
-                    onClick={() => handleAlertClick(alert)}
-                    className="bg-white p-4 rounded-xl border border-slate-200 flex items-start gap-4 hover:bg-blue-50 hover:border-blue-200 hover:shadow-md transition-all duration-200 cursor-pointer group"
-                  >
-                      <div className={`p-3 rounded-full ${alert.risk_level === 'High' ? 'bg-red-100 text-red-600' : 'bg-yellow-100 text-yellow-600'}`}>
-                          <AlertTriangle className="w-6 h-6" />
-                      </div>
-                      <div className="flex-1">
-                          <div className="flex justify-between items-start mb-1">
-                              <h5 className="font-bold text-slate-800">{alert.station_name}</h5>
-                              <span className="text-[10px] text-slate-400">{new Date(alert.generated_at).toLocaleString('th-TH')}</span>
-                          </div>
-                          <p className="text-sm text-slate-600">{alert.message}</p>
-                          <p className="text-xs text-blue-500 mt-2 font-medium group-hover:underline">→ ดูกราฟ GEV และสถิติสถานีนี้</p>
-                      </div>
-                      <ChevronRight className="w-5 h-5 text-slate-300 self-center group-hover:text-blue-400 transition-colors" />
+                <div
+                  key={alert.id}
+                  onClick={() => handleAlertClick(alert)}
+                  className="p-3.5 bg-white border border-slate-200 rounded-xl flex items-start gap-3 hover:bg-blue-50 hover:border-blue-200 transition-all duration-150 cursor-pointer group"
+                >
+                  <div className={`p-2 rounded-full ${alert.risk_level === 'High' ? 'bg-red-100 text-red-600' : 'bg-yellow-100 text-yellow-600'}`}>
+                    <AlertTriangle className="w-5 h-5" />
                   </div>
+                  <div className="flex-1 text-xs font-normal">
+                    <div className="flex justify-between items-start mb-0.5">
+                      <h5 className="font-bold text-slate-800 text-xs">{alert.station_name}</h5>
+                      <span className="text-[10px] text-slate-400">{new Date(alert.generated_at).toLocaleString('th-TH')}</span>
+                    </div>
+                    <p className="text-slate-500 leading-normal">{alert.message}</p>
+                    <p className="text-[10px] text-blue-600 mt-1 font-bold group-hover:underline">→ คลิกเพื่อข้ามไปดูกราฟวิเคราะห์ของสถานีนี้</p>
+                  </div>
+                  <ChevronRight className="w-4 h-4 text-slate-300 self-center group-hover:text-blue-500 transition-colors" />
+                </div>
               ))
             )}
+          </div>
         </div>
-    </div>
-  );
+      </div>
+    );
+  };
 
   const renderDownload = () => (
     <div className="space-y-6 animate-in slide-in-from-bottom duration-500">
@@ -892,9 +1636,13 @@ export default function App() {
   const renderContent = () => {
     switch (activePage) {
       case 'home': return renderHome();
+      case 'overview': return renderOverviewComparison();
       case 'stations': return renderStations();
       case 'map': return renderMap();
+      case 'landuse': return renderLandUse();
+      case 'calendar': return renderCropCalendar();
       case 'advisory': return renderAdvisory();
+      case 'impact': return renderImpactLinkage();
       case 'alerts': return renderAlerts();
       case 'download': return renderDownload();
       default: return renderHome();

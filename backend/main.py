@@ -1,4 +1,6 @@
 from datetime import datetime
+from dotenv import load_dotenv
+load_dotenv() # Load variables from .env
 
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
